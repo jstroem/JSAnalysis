@@ -3,69 +3,69 @@ abstract class ControlFlowNode
 case class ControlFlowASTNode(ASTel:Any = null) extends ControlFlowNode
 case class MergeNode(label:String) extends ControlFlowNode
 
-class ControlFlowGraph(startNode : Option[ControlFlowNode] = None, endNode: Option[ControlFlowNode] = None, n: List[ControlFlowNode] = List(), e: Map[ControlFlowNode, ControlFlowNode] = Map(), l:Map[(ControlFlowNode, ControlFlowNode), String] = Map()) {
-	var start: Option[ControlFlowNode] = startNode
-	var end: Option[ControlFlowNode] = endNode
-	var nodes: List[ControlFlowNode] = n
-	var edges: Map[ControlFlowNode, ControlFlowNode] = e
-	var labels: Map[(ControlFlowNode, ControlFlowNode), String] = l
+case class ControlFlowGraph(
+	start : Option[ControlFlowNode] = None, 
+	end: Option[ControlFlowNode] = None, 
+	nodes: List[ControlFlowNode] = List(), 
+	edges: Map[ControlFlowNode, ControlFlowNode] = Map(), 
+	labels:Map[(ControlFlowNode, ControlFlowNode), String] = Map()
+) {
+	def +(el: ControlFlowNode ) = ControlFlow.append( this, el )
+	def ::(cfg: ControlFlowGraph ) = ControlFlow.concat( this, cfg )
+}
 
-	def append( el : ControlFlowNode,label: String = null ) : ControlFlowGraph = {
-		this.start match {
+object ControlFlow {
+	/******** HELPER METHODS ******/
+	def append( cfg : ControlFlowGraph, el : ControlFlowNode,label: String = null ) : ControlFlowGraph = {
+		cfg.start match {
 			case None => { //Assume everything is empty
-				println(this.nodes.toString())
-				new ControlFlowGraph(Some(el),Some(el),el :: this.nodes,this.edges,this.labels)
+				ControlFlowGraph(Some(el),Some(el),el :: cfg.nodes,cfg.edges,cfg.labels)
 			}
 			case Some(n) => {
 				if (label != null){
-					new ControlFlowGraph(Some(el),this.end,el :: this.nodes,this.edges ++ Map((el,n)) ,this.labels ++ Map(((el,n),label)))
+					ControlFlowGraph(Some(el),cfg.end,el :: cfg.nodes,cfg.edges ++ Map((el,n)) ,cfg.labels ++ Map(((el,n),label)))
 				} else {
-					new ControlFlowGraph(Some(el),this.end,el :: this.nodes,this.edges ++ Map((el,n)),this.labels)
+					ControlFlowGraph(Some(el),cfg.end,el :: cfg.nodes,cfg.edges ++ Map((el,n)),cfg.labels)
 				}
 			}
 		}
 	}
 
-	def prepend( el: ControlFlowNode, label:String = null ) : ControlFlowGraph = {
-		this.end match {
+	def prepend( cfg : ControlFlowGraph, el: ControlFlowNode, label:String = null ) : ControlFlowGraph = {
+		cfg.end match {
 			case None => { //Assume everything is empty
-				new ControlFlowGraph(Some(el),Some(el),el :: this.nodes,this.edges,this.labels)
+				ControlFlowGraph(Some(el),Some(el),el :: cfg.nodes,cfg.edges,cfg.labels)
 			}
 			case Some(n) => {
 				if (label != null)
-					new ControlFlowGraph(this.start,Some(el),el :: this.nodes,this.edges ++ Map((n,el)),this.labels ++ Map(((n,el),label)))
+					ControlFlowGraph(cfg.start,Some(el),el :: cfg.nodes,cfg.edges ++ Map((n,el)),cfg.labels ++ Map(((n,el),label)))
 				else
-					new ControlFlowGraph(this.start,Some(el),el :: this.nodes,this.edges ++ Map((n,el)),this.labels)
+					ControlFlowGraph(cfg.start,Some(el),el :: cfg.nodes,cfg.edges ++ Map((n,el)),cfg.labels)
 			}
 		}
 	}
 
-	def concat(cfg: ControlFlowGraph, label: String = null ) : ControlFlowGraph = {
-		(this.start,cfg.start,this.end) match {
-			case (None,None,_) => cfg//Both empty so just reply one of them.
-			case (None,Some(n),_) => cfg //This is empty
-			case (Some(n),None,_) => this //cfg is empty
+	def concat(cfg1 : ControlFlowGraph, cfg2: ControlFlowGraph, label: String = null ) : ControlFlowGraph = {
+		(cfg1.start,cfg2.start,cfg1.end) match {
+			case (None,None,_) => cfg1//Both empty so just reply one of them.
+			case (None,Some(n),_) => cfg2 //cfg1 is empty
+			case (Some(n),None,_) => cfg1 //cfg2 is empty
 			case (Some(n),Some(m),Some(k)) => {
 				if (label != null)
-					new ControlFlowGraph(this.start,cfg.end,this.nodes ::: cfg.nodes, this.edges ++ cfg.edges ++ Map((k,m)), this.labels ++ cfg.labels ++ Map(((k,m),label)))
+					new ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels ++ Map(((k,m),label)))
 				else 
-					new ControlFlowGraph(this.start,cfg.end,this.nodes ::: cfg.nodes, this.edges ++ cfg.edges ++ Map((k,m)), this.labels ++ cfg.labels)
+					new ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels)
 			}
 		}
 	}
 
-	
-}
 
-
-object ControlFlow {
 	//going recursively
-
 	def statement( s:AST.Statement ) : ControlFlowGraph = s match {
 		case AST.Block( sl ) => statements( sl )
 		case AST.IfStatement(e,s1,s2) => {
-			var cfg1 = expression( e ) 
-			cfg1
+			var cfg1 = expression( e ) :: statement( s1 )
+			var cfg2 = expression( e ) :: statement( s2 )
 /*
 			var cfg2 = cfg1.branch( statement( s1 ) )
 			var cfg3 = cfg1.branch( statement( s2 ) )*/
@@ -74,7 +74,7 @@ object ControlFlow {
 	}
 
 	def statements(ss : List[AST.Statement] ) : ControlFlowGraph = ss match {
-		case s :: ss => statement( s ).concat( statements( ss ) )
+		case s :: ss => statement( s ) :: statements( ss )
 		case Nil => new ControlFlowGraph()
 	}
 
