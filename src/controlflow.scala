@@ -63,9 +63,13 @@ object ControlFlow {
 	//going recursively
 	def statement( s:AST.Statement ) : ControlFlowGraph = s match {
 		case AST.Block( sl ) => statements( sl )
-		case AST.IfStatement(e,s1,s2) => {
+		case AST.IfStatement(e,s1,os2) => {
 			var cfg1 = expression( e ) :: statement( s1 )
-			var cfg2 = expression( e ) :: statement( s2 )
+			var cfg2 = os2 match {
+				case Some(s2) => expression( e ) :: statement( s2 )
+				case None => expression( e )
+			}
+			cfg1
 /*
 			var cfg2 = cfg1.branch( statement( s1 ) )
 			var cfg3 = cfg1.branch( statement( s2 ) )*/

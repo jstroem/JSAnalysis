@@ -2,8 +2,11 @@ object AST {
 	abstract class Identifier //TODO: Create identifier
 
 	abstract class Expression //TODO: Create Expression
+	case class LeftHandSideExpression() extends Expression //TODO: create this
+	case class AssignmentExpression() extends Expression //TODO: create this
 
 	abstract class Statement extends SourceElement //TODO: create statement
+	case class FunctionDeclaration() extends SourceElement //TODO: create this
 
 	abstract class Operation //TODO: create Operation
 
@@ -11,28 +14,35 @@ object AST {
 	//From page 26 at ecma262
 	case class Block(sl : List[Statement]) extends Statement
 
-	case class VariableStatement() extends Statement
+	case class VariableStatement(vds: List[VariableDeclaration]) extends Statement
 	case class EmptyStatement() extends Statement
-	case class ExpressionStatement() extends Statement
-	case class IfStatement(e:Expression,s1:Option[Statement],s2:Option[Statement]) extends Statement
-	case class IterationStatement() extends Statement
-	case class ContinueStatement() extends Statement
-	case class BreakStatement() extends Statement
-	case class ReturnStatement() extends Statement 
-	case class WithStatement() extends Statement
-	case class LabelledStatement() extends Statement
-	case class SwitchStatement() extends Statement
-	case class ThrowStatement() extends Statement
-	case class TryStatement() extends Statement
+	case class ExpressionStatement(e:Expression) extends Statement
+	case class IfStatement(e:Expression,s1: Statement,s2:Option[Statement]) extends Statement
+	case class WhileStamtenet(e:Expression, s:Statement) extends Statement
+	case class DoWhileStamtenet() extends Statement 				//TODO: Create this, Should we maybe leave this out
+	case class ForStatement(e1:Option[Expression],e2:Option[Expression],e3:Option[Expression],s:Statement) extends Statement
+	case class ForInStatement( ) extends Statement 					//TODO: Create this, Should we maybe leave this out
+	case class ContinueStatement(i:Option[Identifier]) extends Statement
+	case class BreakStatement(i:Option[Identifier]) extends Statement
+	case class ReturnStatement(e: Option[Expression]) extends Statement 
+	case class WithStatement(e:Expression, s: Statement) extends Statement
+	case class LabelledStatement(i:Identifier, s: Statement) extends Statement	
+	case class SwitchStatement(e:Expression,cb:CaseBlock) extends Statement
+	case class ThrowStatement(e:Expression) extends Statement
+	case class TryStatement(b:Block,c:Option[Catch], f:Option[Finally]) extends Statement
 	case class DebuggerStatement() extends Statement
 
-	//case class PostfixExpression(e:LeftHandSideExpression,o:Operation) extends Expression
+
+	//Helper classes for statements
+	case class VariableDeclaration(i:Identifier,a:Option[AssignmentExpression])
+	case class CaseBlock(ccs:List[CaseClause])
+	case class CaseClause(e:Expression,ss: List[Statement])
+	case class Catch(i:Identifier,b:Block)
+	case class Finally(b:Block)
 
 
 	//From page 101 at ecma262
 	abstract class SourceElement
-
-	case class FunctionDeclaration() extends SourceElement //TODO: create this
 
 	case class SourceElements(se:SourceElement,ses:SourceElement)
 
