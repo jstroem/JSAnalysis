@@ -15,7 +15,9 @@ case class ControlFlowGraph(
 }
 
 object ControlFlow {
+	/******************************/
 	/******** HELPER METHODS ******/
+	/******************************/
 	def append( cfg : ControlFlowGraph, el : ControlFlowNode,label: String = null ) : ControlFlowGraph = {
 		cfg.start match {
 			case None => { //Assume everything is empty
@@ -52,18 +54,22 @@ object ControlFlow {
 			case (Some(n),None,_) => cfg1 //cfg2 is empty
 			case (Some(n),Some(m),Some(k)) => {
 				if (label != null)
-					new ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels ++ Map(((k,m),label)))
+					ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels ++ Map(((k,m),label)))
 				else 
-					new ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels)
+					ControlFlowGraph(cfg1.start,cfg2.end,cfg1.nodes ::: cfg2.nodes, cfg1.edges ++ cfg2.edges ++ Map((k,m)), cfg1.labels ++ cfg2.labels)
 			}
 		}
 	}
 
-
-	//going recursively
+	/******************************/
+	/*** Recursivly walkthrough ***/
+	/******************************/
 	def statement( s:AST.Statement ) : ControlFlowGraph = s match {
 		case AST.Block( sl ) => statements( sl )
-		case AST.IfStatement(e,s1,os2) => {
+		case AST.VariableStatement(vds) => ControlFlowGraph() //TODO
+		case AST.EmptyStatement() => ControlFlowGraph()
+		case AST.ExpressionStatement(e) => expression(e)
+ 		case AST.IfStatement(e,s1,os2) => {
 			var cfg1 = expression( e ) :: statement( s1 )
 			var cfg2 = os2 match {
 				case Some(s2) => expression( e ) :: statement( s2 )
@@ -74,13 +80,24 @@ object ControlFlow {
 			var cfg2 = cfg1.branch( statement( s1 ) )
 			var cfg3 = cfg1.branch( statement( s2 ) )*/
 		}
-		case _ => new ControlFlowGraph()
+		case AST.WhileStatement(e:Expression, s:Statement) => ControlFlowGraph() //TODO
+		case AST.DoWhileStatement() => ControlFlowGraph() //TODO
+		case AST.ForStatement(_,_,_,_) => ControlFlowGraph()//TODO
+		case AST.ForInStatement() => ControlFlowGraph()//TODO
+		case AST.ContinueStatement(oi) => ControlFlowGraph()//TODO
+		case AST.BreakStatement(i) => ControlFlowGraph() //TODO
+		case AST.ReturnStatement(oe) => ControlFlowGraph() //TODO
+		case AST.WithStatement(e,s) => ControlFlowGraph() //TODO
+		case AST.LabelledStatement(i,s) => ControlFlowGraph() //TODO
+		case AST.SwitchStatement(e,cb) => ControlFlowGraph() //TODO
+		case AST.ThrowStatement(e) => ControlFlowGraph() //TODO
+		case AST.TryStatement(b,oc,of) => ControlFlowGraph() //TODO
 	}
 
 	def statements(ss : List[AST.Statement] ) : ControlFlowGraph = ss match {
 		case s :: ss => statement( s ) :: statements( ss )
-		case Nil => new ControlFlowGraph()
+		case Nil => ControlFlowGraph()
 	}
 
-	def expression( e:AST.Expression ) : ControlFlowGraph = new ControlFlowGraph()
+	def expression( e:AST.Expression ) : ControlFlowGraph = ControlFlowGraph()
 }

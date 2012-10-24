@@ -13,13 +13,12 @@ object AST {
 
 	//From page 26 at ecma262
 	case class Block(sl : List[Statement]) extends Statement
-
 	case class VariableStatement(vds: List[VariableDeclaration]) extends Statement
 	case class EmptyStatement() extends Statement
 	case class ExpressionStatement(e:Expression) extends Statement
 	case class IfStatement(e:Expression,s1: Statement,s2:Option[Statement]) extends Statement
-	case class WhileStamtenet(e:Expression, s:Statement) extends Statement
-	case class DoWhileStamtenet() extends Statement 				//TODO: Create this, Should we maybe leave this out
+	case class WhileStatement(e:Expression, s:Statement) extends Statement
+	case class DoWhileStatement() extends Statement 				//TODO: Create this, Should we maybe leave this out
 	case class ForStatement(e1:Option[Expression],e2:Option[Expression],e3:Option[Expression],s:Statement) extends Statement
 	case class ForInStatement( ) extends Statement 					//TODO: Create this, Should we maybe leave this out
 	case class ContinueStatement(i:Option[Identifier]) extends Statement
