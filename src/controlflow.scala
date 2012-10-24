@@ -2,6 +2,9 @@ abstract class ControlFlowNode
 
 case class ControlFlowASTNode(ASTel:Any = null) extends ControlFlowNode
 case class MergeNode(label:String) extends ControlFlowNode
+case class ContinueNode(i:Identifier) extends ControlFlowNode
+case class ReturnNode() extends ControlFlowNode
+case class ThrowNode(e:Expression) extends ControlFlowNode
 
 case class ControlFlowGraph(
 	start : Option[ControlFlowNode] = None, 
