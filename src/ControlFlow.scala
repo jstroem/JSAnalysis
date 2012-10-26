@@ -1,3 +1,4 @@
+package JSAnalyzer
 
 object CFG {
 	abstract class ControlFlowNode	
@@ -15,7 +16,7 @@ object CFG {
 		start : ControlFlowNode, 
 		end: ControlFlowNode, 
 		nodes: List[ControlFlowNode] = List(), 
-		edges: Map[ControlFlowNode, ControlFlowNode] = Map(), 
+		edges: List[(ControlFlowNode, ControlFlowNode)] = List(), 
 		labels:Map[(ControlFlowNode, ControlFlowNode), String] = Map()
 	) {
 		def +(el: ControlFlowNode ) = ControlFlow.append( this, el )
@@ -34,15 +35,15 @@ object ControlFlow {
 	/******************************/
 	def append( cfg : CFG.ControlFlowGraph, el : CFG.ControlFlowNode,label: Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
-			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,cfg.edges ++ Map((el,cfg.start)) ,cfg.labels ++  Map(((el,cfg.start),label)))
-			case None => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,cfg.edges ++ Map((el,cfg.start)) ,cfg.labels)
+			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++  Map(((el,cfg.start),label)))
+			case None => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels)
 		}	
 	}
 
 	def prepend( cfg : CFG.ControlFlowGraph, el: CFG.ControlFlowNode, label:Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
-			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,cfg.edges ++ Map((cfg.end,el)), cfg.labels ++ Map(((cfg.end,el),label)))
-			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,cfg.edges ++ Map((cfg.end,el)), cfg.labels)
+			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)))
+			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels)
 		}
 		
 	}
@@ -53,14 +54,14 @@ object ControlFlow {
 					cfg1.start,
 					cfg2.end,
 					cfg1.nodes ::: cfg2.nodes, 
-					cfg1.edges ++ cfg2.edges ++ Map((cfg1.end,cfg2.start)), 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
 					cfg1.labels ++ cfg2.labels ++ Map(((cfg1.end,cfg2.start),label))
 				)
 			case None => CFG.ControlFlowGraph(
 					cfg1.start,
 					cfg2.end,
 					cfg1.nodes ::: cfg2.nodes, 
-					cfg1.edges ++ cfg2.edges ++ Map((cfg1.end,cfg2.start)), 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
 					cfg1.labels ++ cfg2.labels
 				)
 		}
@@ -80,14 +81,14 @@ object ControlFlow {
 							cfg.start,
 							mergePoint, 
 							cfg.nodes ::: added.nodes, 
-							cfg.edges ++ added.edges ++ Map((cfg.end,added.start),(added.end,mergePoint)), 
+							(cfg.end,added.start) :: (added.end,mergePoint) :: cfg.edges ::: added.edges, 
 							cfg.labels ++ added.labels ++ Map(((cfg.end,added.start),label))
 						)
 					case None => CFG.ControlFlowGraph(	
 							cfg.start,
 							mergePoint, 
 							cfg.nodes ::: added.nodes, 
-							cfg.edges ++ added.edges ++ Map((cfg.end,added.start),(added.end,mergePoint)), 
+							(cfg.end,added.start) :: (added.end,mergePoint) :: cfg.edges ::: added.edges, 
 							cfg.labels ++ added.labels
 						)
 				}
@@ -99,7 +100,10 @@ object ControlFlow {
 	/*** Recursivly walkthrough ***/
 	/******************************/
 	def statement( s:AST.Statement ) : CFG.ControlFlowGraph = s match {
-		case AST.Block( sl ) => statements( sl )
+		case AST.Block( sl ) => sl match {
+			case Some(sl) => statements( sl )
+			case None => emptyCFG()
+		}
 		case AST.VariableStatement(vds) => throw NotImplementedException()
 		case AST.EmptyStatement() => throw NotImplementedException()
 		case AST.ExpressionStatement(e) => expression(e)
