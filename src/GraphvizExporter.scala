@@ -14,7 +14,7 @@ object GraphvizExporter {
  			cfg.edges.foldLeft(seen){
 	 			case(seen,(n1, n2)) => {
 			 		if (currNode.equals(n1)) {
-			 			export.println(edgeToString(n1,n2,cfg.labels.get(n,n2)))
+			 			export.println(edgeToString(n1,n2,cfg.labels.get(n1,n2)))
 			 			if (!seen.contains(n2)) recPrinter(n2,n2 :: seen)
 			 			else n2 :: seen
 			 		}
@@ -35,7 +35,7 @@ object GraphvizExporter {
  	}
 
  	def edgeToString(n1 : CFG.ControlFlowNode, n2 : CFG.ControlFlowNode, label : Option[String]) : String = label match {
- 		case Some(label) => "\""+nodeToString(n1) + "\" -> \"" + nodeToString(n2) + "\"[label="+label+"]"
+ 		case Some(label) => "\""+nodeToString(n1) + "\" -> \"" + nodeToString(n2) + "\"[label=\""+label+"\"]"
  		case None => "\""+nodeToString(n1) + "\" -> \"" + nodeToString(n2)+"\""
  	}
 }

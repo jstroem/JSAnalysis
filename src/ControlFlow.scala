@@ -38,7 +38,7 @@ object ControlFlow {
 	/******************************/
 	def append( cfg : CFG.ControlFlowGraph, el : CFG.ControlFlowNode,label: Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
-			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++  Map(((el,cfg.start),label)))
+			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++ Map(((el,cfg.start),label)))
 			case None => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels)
 		}	
 	}
@@ -79,20 +79,20 @@ object ControlFlow {
 		if (branches.size == 0) cfg
 		else {
 			branches.foldLeft(CFG.ControlFlowGraph(cfg.start,cfg.end,mergePoint :: cfg.nodes, cfg.edges, cfg.labels)){
-				case (cfg, (added, label)) => label match {
+				case (newCfg, (added, label)) => label match {
 					case Some(label) => CFG.ControlFlowGraph(	
 							cfg.start,
 							mergePoint, 
-							cfg.nodes ::: added.nodes, 
-							(cfg.end,added.start) :: (added.end,mergePoint) :: cfg.edges ::: added.edges, 
-							cfg.labels ++ added.labels ++ Map(((cfg.end,added.start),label))
+							newCfg.nodes ::: added.nodes, 
+							(cfg.end,added.start) :: (added.end,mergePoint) :: newCfg.edges ::: added.edges, 
+							newCfg.labels ++ added.labels ++ Map(((cfg.end,added.start),label))
 						)
 					case None => CFG.ControlFlowGraph(	
 							cfg.start,
 							mergePoint, 
-							cfg.nodes ::: added.nodes, 
-							(cfg.end,added.start) :: (added.end,mergePoint) :: cfg.edges ::: added.edges, 
-							cfg.labels ++ added.labels
+							newCfg.nodes ::: added.nodes, 
+							(cfg.end,added.start) :: (added.end,mergePoint) :: newCfg.edges ::: added.edges, 
+							newCfg.labels ++ added.labels
 						)
 				}
 			}
