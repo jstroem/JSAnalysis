@@ -1,7 +1,10 @@
 package JSAnalyzer
 
+import java.util.UUID
+
 object CFG {
-	abstract class ControlFlowNode	
+
+	abstract class ControlFlowNode()
 	case class ControlFlowASTNode(ASTel:Any = null) extends ControlFlowNode
 	case class Merge(label:String) extends ControlFlowNode
 	case class Continue(i:AST.Identifier) extends ControlFlowNode
@@ -10,7 +13,7 @@ object CFG {
 	case class Assignments(i:AST.Identifier,e:AST.Expression) extends ControlFlowNode
 	case class If(e:AST.Expression) extends ControlFlowNode
 	case class ThrowNode(e:AST.Expression) extends ControlFlowNode
-	case class EmptyNode() extends ControlFlowNode
+	case class EmptyNode(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 
 	case class ControlFlowGraph(
 		start : ControlFlowNode, 
@@ -54,14 +57,14 @@ object ControlFlow {
 					cfg1.start,
 					cfg2.end,
 					cfg1.nodes ::: cfg2.nodes, 
-					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, // (cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
 					cfg1.labels ++ cfg2.labels ++ Map(((cfg1.end,cfg2.start),label))
 				)
 			case None => CFG.ControlFlowGraph(
 					cfg1.start,
 					cfg2.end,
 					cfg1.nodes ::: cfg2.nodes, 
-					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, //(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
 					cfg1.labels ++ cfg2.labels
 				)
 		}
