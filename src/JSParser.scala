@@ -1,8 +1,9 @@
+package JSAnalyzer
+
 import scala.util.parsing.combinator.RegexParsers
 
-class JSParser extends RegexParsers {
-  
-  val Keyword = "break" |
+object JSParser extends RegexParsers { 
+  lazy val Keyword = "break" |
 		  		"do" |
                 "instanceof" |
                 "typeof" |
@@ -30,17 +31,17 @@ class JSParser extends RegexParsers {
                 "try"
              ;
   
-  val FunctionBody = "{" ~ opt(SourceElements) ~ "}"
-                   ;
+  lazy val FunctionBody = positioned("{" ~> opt(StatementList) <~ "}" ^^ { AST.Block(_) }
+                   );
 
-  val BitwiseANDExpressionNoIn = EqualityExpressionNoIn ~ rep(BitwiseANDOperator ~ EqualityExpressionNoIn)
-                               ;
+  lazy val BitwiseANDExpressionNoIn = positioned(EqualityExpressionNoIn * (BitwiseANDOperator ^^ makeBinaryOp)
+                               );
 
-  val Elision = rep1(",")
+  lazy val Elision = rep1(",") ^^ { _ map (a => AST.Undefined()) }
               ;
 
-  val Statement = Block |
-                  JScriptVarStatement |
+  lazy val Statement = positioned(Block |
+                  //JScriptVarStatement |
                   VariableStatement |
                   EmptyStatement |
                   LabelledStatement |
@@ -55,40 +56,40 @@ class JSParser extends RegexParsers {
                   SwitchStatement |
                   ThrowStatement |
                   TryStatement  
-                ;
+                );
 
-  val VariableDeclarationNoIn = Identifier ~ opt(InitialiserNoIn)
-                              ;
+  lazy val VariableDeclarationNoIn = positioned(Identifier ~ opt(InitialiserNoIn) ^^ { case id ~ i => AST.VariableDeclaration(id, i) }
+                              );
 
-  val LogicalANDExpression = BitwiseORExpression ~ rep(LogicalANDOperator ~ BitwiseORExpression)
-                           ;
+  lazy val LogicalANDExpression = positioned(BitwiseORExpression * (LogicalANDOperator ^^ makeBinaryOp)
+                           );
 
-  val ArgumentList = rep1sep(AssignmentExpression, ",")
+  lazy val ArgumentList = rep1sep(AssignmentExpression, ",")
                    ;
 
-  val LogicalOROperator = "||"
+  lazy val LogicalOROperator = "||"
                         ;
 
-  val PostfixOperator = "++" | "--"
+  lazy val PostfixOperator = "++" | "--"
                       ;
 
-  val ExpressionStatement = Expression ~ opt(";")
-                          ;
+  lazy val ExpressionStatement = positioned(Expression <~ opt(";") ^^ { AST.ExpressionStatement(_) }
+                          );
 
-  val CaseClauses = rep1(CaseClause)
+  lazy val CaseClauses = rep1(CaseClause)
                   ;
 
-  val StatementList = rep1(Statement)
+  lazy val StatementList:Parser[List[AST.Statement]] = rep1(Statement)
                     ;
 
-  val BitwiseORExpressionNoIn = BitwiseXORExpressionNoIn ~ rep(BitwiseOROperator ~ BitwiseXORExpressionNoIn)
-                              ;
+  lazy val BitwiseORExpressionNoIn = positioned(BitwiseXORExpressionNoIn * (BitwiseOROperator ^^ makeBinaryOp)
+                              );
 
-  val CaseBlock = "{" ~ opt(CaseClauses) ~ "}" |
-                  DefaultClause ~ opt(CaseClauses) ~ "}"  
+  lazy val CaseBlock = ("{" ~> opt(CaseClauses)) ~ DefaultClause ~ (opt(CaseClauses) <~ "}") ^^ { case c1 ~ d ~ c2 => { AST.CaseBlock((c1.getOrElse(Nil) ::: List(d)) ++ c2.getOrElse(Nil)) } } |
+                  "{" ~> opt(CaseClauses) <~ "}" ^^ { x => { AST.CaseBlock(x.getOrElse(Nil)) } }
                 ;
 
-  val AssignmentOperator = "=" |
+  lazy val AssignmentOperator = "=" |
                            "*=" |
                            "/=" |
                            "%=" |
@@ -102,263 +103,280 @@ class JSParser extends RegexParsers {
                            "|="  
                          ;
 
-  val FunctionExpression = "function" ~ opt(Identifier) ~ "(" ~ opt(FormalParameterList) ~ ")" ~ FunctionBody
-                         ;
+  lazy val FunctionExpression = positioned("function" ~> opt(Identifier) ~ ("(" ~> opt(FormalParameterList) <~ ")") ~ FunctionBody ^^ { case name ~ params ~ body => { AST.FunctionExpression(name, params, body) } }
+                         );
 
-  val Finally = "finally" ~ Block
-              ;
+  lazy val Finally = positioned("finally" ~> Block
+              );
 
-  val SourceElement = FunctionDeclaration |
+  lazy val SourceElement = positioned(FunctionDeclaration |
                       Statement  
-                    ;
+                    );
 
-  val CaseClause = "case" ~ Expression ~ ":" ~ opt(StatementList)
-                 ;
+  lazy val CaseClause = positioned("case" ~> Expression ~ (":" ~> opt(StatementList)) ^^ { case e ~ ss => { AST.CaseClause(e, ss) } }
+                 );
 
-  val EmptyStatement = ";"
+  lazy val EmptyStatement = ";" ^^^ { AST.EmptyStatement() }
                      ;
 
-  val ReturnStatement = "return" ~ opt(Expression) ~ opt(";")
-                      ;
+  lazy val ReturnStatement = positioned("return" ~> opt(Expression) <~ opt(";") ^^ { AST.ReturnStatement(_) }
+                      );
 
-  val PostfixExpression = LeftHandSideExpression ~ opt(PostfixOperator)
-                        ;
+  lazy val PostfixExpression = positioned(LeftHandSideExpression ~ PostfixOperator ^^ { case e ~ op => { AST.PostfixExpression(op, e) } } |
+                                     LeftHandSideExpression
+                        );
 
-  val AdditiveOperator = "+" |
+  lazy val AdditiveOperator = "+" |
                          "-"  
                        ;
 
-  val MemberExpressionPart = "[" ~ Expression ~ "]" |
-                             "." ~ Identifier  
+  lazy val MemberExpressionPart:Parser[AST.Expression=>AST.MemberAccessExpression] = "[" ~> Expression <~ "]" ^^ { x => { y:AST.Expression => AST.ArrayAccessExpression(y, x) } } |
+                             "." ~> Identifier ^^ { x => { y:AST.Expression => AST.ObjectAccessExpression(y, x) } }  
                            ;
 
-  val BitwiseANDExpression = EqualityExpression ~ rep(BitwiseANDOperator ~ EqualityExpression)
-                           ;
+  lazy val BitwiseANDExpression = positioned(EqualityExpression * (BitwiseANDOperator ^^ makeBinaryOp)
+                           );
 
-  val EqualityExpression = RelationalExpression ~ rep(EqualityOperator ~ RelationalExpression)
-                         ;
+  lazy val EqualityExpression = positioned(RelationalExpression * (EqualityOperator ^^ makeBinaryOp)
+                         );
 
-  val VariableDeclarationList = VariableDeclaration ~ rep("," ~ VariableDeclaration)
+  lazy val VariableDeclarationList = rep1sep(VariableDeclaration, ",")
                               ;
 
-  val MultiplicativeExpression = UnaryExpression ~ rep(MultiplicativeOperator ~ UnaryExpression)
-                               ;
+  lazy val MultiplicativeExpression = positioned(UnaryExpression * (MultiplicativeOperator ^^ makeBinaryOp)
+                               );
 
-  val ConditionalExpressionNoIn = LogicalORExpressionNoIn ~ opt("?" ~ AssignmentExpression ~ ":" ~ AssignmentExpressionNoIn)
-                                ;
+  lazy val ConditionalExpressionNoIn = positioned((LogicalORExpressionNoIn <~ "?") ~ (AssignmentExpression <~ ":") ~ AssignmentExpressionNoIn ^^ { case c ~ i ~ e => AST.ConditionalExpression(c, i, e) } |
+                                             LogicalORExpressionNoIn
+                                );
 
-  val BreakStatement = "break" ~ opt(Identifier) ~ opt(";")
-                     ;
+  lazy val BreakStatement = positioned("break" ~> opt(Identifier) <~ opt(";") ^^ { AST.BreakStatement(_) }
+                     );
 
-  val VariableDeclarationListNoIn = VariableDeclarationNoIn ~ rep("," ~ VariableDeclarationNoIn)
+  lazy val VariableDeclarationListNoIn = rep1sep(VariableDeclarationNoIn, ",")
                                   ;
 
-  val MemberExpressionForIn = FunctionExpression |
-                              PrimaryExpression ~ rep(MemberExpressionPart)  
-                            ;
+  def combineMember(soFar: AST.Expression, constructor: AST.Expression => AST.Expression) = {
+    constructor(soFar)
+  }
+  
+  lazy val MemberExpressionForIn = positioned(FunctionExpression |
+                              PrimaryExpression ~ rep(MemberExpressionPart) ^^ { case start ~ mods => mods.foldLeft(start)(combineMember) }
+                            );
 
-  val AssignmentExpression = LeftHandSideExpression ~ AssignmentOperator ~ AssignmentExpression |
+  lazy val AssignmentExpression:Parser[AST.Expression] = positioned(LeftHandSideExpression ~ AssignmentOperator ~ AssignmentExpression ^^ { case lhs ~ op ~ rhs => AST.AssignmentExpression(lhs, op, rhs) } |
                              ConditionalExpression  
-                           ;
+                           );
 
-  val SourceElements = rep1(SourceElement)
+  lazy val SourceElements: Parser[List[AST.SourceElement]] = rep1(SourceElement)
                      ;
 
-  val EqualityOperator = "==" |
+  lazy val EqualityOperator = "==" |
                          "!=" |
                          "===" |
                          "!=="  
                        ;
 
-  val MultiplicativeOperator = "*" |
+  lazy val MultiplicativeOperator = "*" |
                                "/" |
                                "%"  
                              ;
 
-  val LogicalORExpressionNoIn = LogicalANDExpressionNoIn ~ rep(LogicalOROperator ~ LogicalANDExpressionNoIn)
-                              ;
+  lazy val LogicalORExpressionNoIn = positioned(LogicalANDExpressionNoIn * (LogicalOROperator ^^ makeBinaryOp)
+                              );
 
-  val ImportStatement = "import" ~ Name ~ opt("." ~ "*") ~ ";"
-                      ;
+  lazy val ImportStatement = positioned("import" ~> Name ~ (opt("." ~> "*") <~ ";") ^^ { case names ~ wild => AST.ImportStatement(names, wild.isDefined) }
+                      );
 
-  val IdentifierName = not(Keyword) ~ """[A-Za-z\$_][A-Za-z0-9\$_]+""".r
+  lazy val IdentifierName = not(Keyword) ~> """[A-Za-z\$_][A-Za-z0-9\$_]*""".r;
   
-  val Identifier = IdentifierName
-                 ;
+  lazy val Identifier = positioned(IdentifierName ^^ { AST.Identifier(_) }
+                 );
 
-  val Block = "{" ~ opt(StatementList) ~ "}"
-            ;
+  lazy val Block: Parser[AST.Block] = positioned("{" ~> opt(StatementList) <~ "}" ^^ { AST.Block(_) }
+            );
 
-  val MemberExpression = FunctionExpression |
-                         PrimaryExpression ~ rep(MemberExpressionPart) |
-                         AllocationExpression  
-                       ;
+  lazy val MemberExpression = positioned((FunctionExpression | PrimaryExpression) ~ rep(MemberExpressionPart) ^^ { case start ~ mods => mods.foldLeft(start)(combineMember) } |
+                         AllocationExpression
+                       );
 
-  val ThrowStatement = "throw" ~ Expression ~ opt(";")
-                     ;
+  lazy val ThrowStatement = positioned("throw" ~> Expression <~ opt(";") ^^ { AST.ThrowStatement(_) }
+                     );
 
-  val RelationalExpression = ShiftExpression ~ rep(RelationalOperator ~ ShiftExpression)
-                           ;
+  lazy val RelationalExpression = positioned(ShiftExpression * (RelationalOperator ^^ makeBinaryOp)
+                           );
 
-  val InitialiserNoIn = "=" ~ AssignmentExpressionNoIn
-                      ;
+  lazy val InitialiserNoIn = positioned("=" ~> AssignmentExpressionNoIn
+                      );
 
-  val VariableStatement = "var" ~ VariableDeclarationList ~ opt(";")
-                        ;
+  lazy val VariableStatement = positioned("var" ~> VariableDeclarationList <~ opt(";") ^^ { AST.VariableStatement(_) }
+                        );
 
-  val BitwiseXOROperator = "^"
+  lazy val BitwiseXOROperator = "^"
                          ;
 
-  val CallExpressionForIn = MemberExpressionForIn ~ Arguments ~ rep(CallExpressionPart)
-                          ;
+  lazy val CallExpressionForIn = positioned(MemberExpressionForIn ~ Arguments ~ rep(CallExpressionPart) ^^ { case exp ~ args ~ parts => { parts.foldLeft(AST.CallExpression(exp, args).asInstanceOf[AST.Expression])(combineMember) } }
+                          );
 
-  val CallExpression = MemberExpression ~ Arguments ~ rep(CallExpressionPart)
-                     ;
-
-  val Literal = DecimalLiteral |
+  lazy val CallExpression = positioned(MemberExpression ~ Arguments ~ rep(CallExpressionPart) ^^ { case exp ~ args ~ parts => { parts.foldLeft(AST.CallExpression(exp, args).asInstanceOf[AST.Expression])(combineMember) } }
+                     );
+  
+  lazy val Literal:Parser[AST.Literal] = positioned(DecimalLiteral |
                 HexIntegerLiteral |
                 StringLiteral |
                 BooleanLiteral |
                 NullLiteral //|
                 //RegularExpressionLiteral  
+              );
+  
+  lazy val HexIntegerLiteral = """0[xX][0-9A-Fa-f]+""".r ^^ { AST.HexIntegerLiteral(_) };
+  
+  lazy val BooleanLiteral = "true" ^^^ { AST.BooleanLiteral(true) } | "false" ^^^ { AST.BooleanLiteral(false) }
+  
+  lazy val NullLiteral = "null" ^^^ { AST.NullLiteral() };
+
+  lazy val Program = opt(SourceElements) ^^ { AST.Program(_) }
               ;
-  
-  val HexIntegerLiteral = """0[xX][0-9A-Fa-f]+""".r
-  
-  val BooleanLiteral = "true" | "false"
-  
-  val NullLiteral = "null"
 
-  val Program = opt(SourceElements)
-              ;
+  lazy val VariableDeclaration = positioned(Identifier ~ opt(Initialiser) ^^ { case id ~ i => AST.VariableDeclaration(id, i) }
+                          );
 
-  val VariableDeclaration = Identifier ~ opt(Initialiser)
-                          ;
+  lazy val ContinueStatement = positioned("continue" ~> opt(Identifier) <~ opt(";") ^^ { AST.ContinueStatement(_) }
+                        );
 
-  val ContinueStatement = "continue" ~ opt(Identifier) ~ opt(";")
-                        ;
+  lazy val SwitchStatement = positioned(("switch" ~> "(" ~> Expression <~ ")") ~ CaseBlock ^^ { case e ~ cb => AST.SwitchStatement(e, cb) }
+                      );
 
-  val SwitchStatement = "switch" ~ "(" ~ Expression ~ ")" ~ CaseBlock
-                      ;
+  lazy val BitwiseXORExpressionNoIn = positioned(BitwiseANDExpressionNoIn * (BitwiseXOROperator ^^ makeBinaryOp)
+                               );
 
-  val BitwiseXORExpressionNoIn = BitwiseANDExpressionNoIn ~ rep(BitwiseXOROperator ~ BitwiseANDExpressionNoIn)
-                               ;
+  lazy val RelationalExpressionNoIn = positioned(ShiftExpression * (RelationalNoInOperator ^^ makeBinaryOp)
+                               );
 
-  val RelationalExpressionNoIn = ShiftExpression ~ rep(RelationalNoInOperator ~ ShiftExpression)
-
-  val LogicalANDOperator = "&&"
+  lazy val LogicalANDOperator = "&&"
                          ;
 
-  val JScriptVarDeclarationList = rep1sep(JScriptVarDeclaration, ",")
-                                ;
+  //val JScriptVarDeclarationList = positioned(rep1sep(JScriptVarDeclaration, ",")
+  //                              );
 
-  val PropertyName = Identifier |
+  lazy val PropertyName:Parser[AST.Expression] = positioned(Identifier |
                      StringLiteral |
                      DecimalLiteral  
-                   ;
+                   );
 
-  val StringLiteral = """\"[^\"]*\"""".r
+  lazy val StringLiteral = """\"[^\"]*\"""".r ^^ { AST.StringLiteral(_) }
+                    ;
 
-  val DecimalIntegerLiteral = "0" | """[1-9][0-9]*""".r
-
-  val DecimalLiteral = DecimalIntegerLiteral ~ "." ~ """[0-9]*""".r ~ """([Ee][+-]?[0-9]+)?""".r
-  
-  val AllocationExpression = "new" ~ MemberExpression ~ rep(Arguments ~ rep(MemberExpressionPart))
-                           ;
-
-  val Catch = "catch" ~ "(" ~ Identifier ~ ")" ~ Block
-            ;
-
-  val TryStatement = "try" ~ Block ~ Finally |
-                                     Catch ~ opt(Finally)  
-                   ;
-
-  val FormalParameterList = Identifier ~ rep("," ~ Identifier)
-                          ;
-
-  val BitwiseORExpression = BitwiseXORExpression ~ rep(BitwiseOROperator ~ BitwiseXORExpression)
-                          ;
-
-  val Expression = AssignmentExpression ~ rep("," ~ AssignmentExpression)
-                 ;
-
-  val AdditiveExpression = MultiplicativeExpression ~ rep(AdditiveOperator ~ MultiplicativeExpression)
-                         ;
-
-  val ConditionalExpression = LogicalORExpression ~ opt("?" ~ AssignmentExpression ~ ":" ~ AssignmentExpression)
+  lazy val DecimalIntegerLiteral = "0" | """[1-9][0-9]*""".r 
                             ;
 
-  val UnaryExpression = PostfixExpression |
-                        rep1(UnaryOperator ~ UnaryExpression)  
-                      ;
+  lazy val DecimalLiteral = DecimalIntegerLiteral ~ "." ~ """[0-9]*""".r ~ """([Ee][+-]?[0-9]+)?""".r ^^ { case a~b~c~d => AST.DecimalLiteral(a+b+c+d) } |
+                            "." ~ """[0-9]+""".r ~ """([Ee][+-]?[0-9]+)?""".r  ^^ { case a~b~c => AST.DecimalLiteral(a+b+c) } |
+                            DecimalIntegerLiteral ~ """([Ee][+-]?[0-9]+)?""".r ^^ { case a~b => AST.DecimalLiteral(a+b) }
+                     ;
+  
+  lazy val ArgumentMemberExpressionParts = Arguments ~ rep(MemberExpressionPart) ^^ { case args ~ parts => { exp:AST.Expression => { parts.foldLeft(AST.CallExpression(exp, args).asInstanceOf[AST.Expression])(combineMember) } } }
+                                    ;
+                     
+  lazy val AllocationExpression:Parser[AST.AllocationExpression] = positioned(("new" ~> MemberExpression) ~ rep(ArgumentMemberExpressionParts) ^^ { case start ~ parts => { AST.AllocationExpression(parts.foldLeft(start)(combineMember)) } }
+                           );
 
-  val LeftHandSideExpression = CallExpression |
-                               MemberExpression  
-                             ;
+  lazy val Catch = positioned(("catch" ~> "(" ~> Identifier) ~ (")" ~> Block) ^^ { case id ~ block => AST.Catch(id, block) }
+            );
 
-  val FunctionDeclaration = "function" ~ Identifier ~ "(" ~ opt(FormalParameterList) ~ ")" ~ FunctionBody
+  lazy val TryStatement = positioned("try" ~> Block ~ Finally ^^ { case b ~ f => AST.TryStatement(b, None, Some(f)) } |
+                                "try" ~> Block ~ Catch ~ opt(Finally) ^^ { case b ~ c ~ f => AST.TryStatement(b, Some(c), f) }
+                   );
+
+  lazy val FormalParameterList = rep1sep(Identifier, ",")
                           ;
 
-  val Initialiser = "=" ~ AssignmentExpression
-                  ;
+  lazy val BitwiseORExpression = positioned(BitwiseXORExpression * (BitwiseOROperator ^^ makeBinaryOp)
+                          );
 
-  val CallExpressionPart = Arguments |
-                           "[" ~ Expression ~ "]" |
-                           "." ~ Identifier  
+  lazy val Expression = positioned(rep1sep(AssignmentExpression, ",") ^^ { AST.ExpressionList(_) }
+                 );
+
+  lazy val AdditiveExpression = positioned(MultiplicativeExpression * (AdditiveOperator ^^ makeBinaryOp)
+                         );
+
+  lazy val ConditionalExpression = positioned((LogicalORExpression ~ ("?" ~> AssignmentExpression) ~ (":" ~> AssignmentExpression)) ^^ { case c ~ i ~ e => AST.ConditionalExpression(c, i, e) } |
+                              LogicalORExpression
+                            );
+  
+  lazy val UnaryExpression: Parser[AST.Expression] = positioned(PostfixExpression |
+                        rep1(UnaryOperator) ~ PostfixExpression ^^ { case ops ~ e => { ops.foldRight(e)((op:String, soFar:AST.Expression) => { AST.UnaryExpression(op, soFar) }) } } 
+                      );
+
+  lazy val LeftHandSideExpression: Parser[AST.Expression] = positioned(CallExpression |
+                               MemberExpression  
+                             );
+
+  lazy val FunctionDeclaration = positioned("function" ~> Identifier ~ ("(" ~> opt(FormalParameterList) <~ ")") ~ FunctionBody ^^ { 
+                              case name ~ params ~ body => { AST.FunctionDeclaration(name, params, body) }
+                            }
+                          );
+
+  lazy val Initialiser = positioned("=" ~> AssignmentExpression
+                  );
+
+  lazy val CallExpressionPart:Parser[AST.Expression => AST.Expression] = Arguments ^^ { x => { y:AST.Expression => AST.CallExpression(y, x) } } |
+                           "[" ~> Expression <~ "]" ^^ { x => { y:AST.Expression => AST.ArrayAccessExpression(y, x) } } |
+                           "." ~> Identifier ^^ { x => { y:AST.Expression => AST.ObjectAccessExpression(y, x) } }
                          ;
 
-  val RelationalNoInOperator = "<" |
+  lazy val RelationalNoInOperator = "<" |
                                ">" |
                                "<=" |
                                ">=" |
                                "instanceof"  
                              ;
 
-  val AssignmentExpressionNoIn = LeftHandSideExpression ~ AssignmentOperator ~ AssignmentExpressionNoIn |
+  lazy val AssignmentExpressionNoIn:Parser[AST.Expression] = positioned(LeftHandSideExpression ~ AssignmentOperator ~ AssignmentExpressionNoIn ^^ { case lhs ~ op ~ rhs => { AST.AssignmentExpression(lhs, op, rhs) } } |
                                  ConditionalExpressionNoIn  
-                               ;
+                               );
 
-  val PrimaryExpression = "this" |
+  lazy val PrimaryExpression = positioned("this" ^^^ { AST.This() } |
                           ObjectLiteral |
-                          "(" ~ Expression ~ ")" |
+                          "(" ~> Expression <~ ")" |
                           Identifier |
                           ArrayLiteral |
-                          Literal  
-                        ;
+                          Literal
+                        );
 
-  val LogicalANDExpressionNoIn = BitwiseORExpressionNoIn ~ rep(LogicalANDOperator ~ BitwiseORExpressionNoIn)
+  lazy val LogicalANDExpressionNoIn = positioned(BitwiseORExpressionNoIn * (LogicalANDOperator ^^ makeBinaryOp)
+                               );
+
+  lazy val PropertyNameAndValueList = rep1sep(PropertyNameAndValue, ",") |
+                                                           "," ^^^ { Nil }
                                ;
 
-  val PropertyNameAndValueList = PropertyNameAndValue ~ rep("," ~ PropertyNameAndValue |
-                                                           ",")  
-                               ;
-
-  val Arguments = "(" ~ opt(ArgumentList) ~ ")"
+  lazy val Arguments = "(" ~> opt(ArgumentList) <~ ")"
                 ;
 
-  val ObjectLiteral = "{" ~ opt(PropertyNameAndValueList) ~ "}"
-                    ;
+  lazy val ObjectLiteral = positioned("{" ~> opt(PropertyNameAndValueList) <~ "}" ^^ { AST.ObjectLiteral(_) }
+                    );
 
-  val ExpressionNoIn = AssignmentExpressionNoIn ~ rep("," ~ AssignmentExpressionNoIn)
+  lazy val ExpressionNoIn = rep1sep(AssignmentExpressionNoIn, ",") ^^ { AST.ExpressionList(_) }
                      ;
 
-  val LeftHandSideExpressionForIn = CallExpressionForIn |
+  lazy val LeftHandSideExpressionForIn = positioned(CallExpressionForIn |
                                     MemberExpressionForIn  
-                                  ;
+                                  );
 
-  val ElementList = opt(Elision) ~ AssignmentExpression ~ rep(Elision ~ AssignmentExpression)
+  lazy val ElementList = opt(Elision) ~> rep1sep(AssignmentExpression, Elision)
                   ;
 
-  val LabelledStatement = Identifier ~ ":" ~ Statement
-                        ;
+  lazy val LabelledStatement:Parser[AST.LabelledStatement] = positioned((Identifier <~ ":") ~ Statement ^^ { case i ~ s => AST.LabelledStatement(i, s) }
+                        );
 
-  val DefaultClause = "default" ~ ":" ~ opt(StatementList)
+  lazy val DefaultClause = "default" ~> ":" ~> opt(StatementList) ^^ { AST.DefaultClause(_) }
                     ;
 
-  val BitwiseOROperator = "|"
+  lazy val BitwiseOROperator = "|"
                         ;
 
-  val UnaryOperator = "delete" |
+  lazy val UnaryOperator = "delete" |
                       "void" |
                       "typeof" |
                       "++" |
@@ -369,7 +387,7 @@ class JSParser extends RegexParsers {
                       "!"  
                     ;
 
-  val RelationalOperator = "<" |
+  lazy val RelationalOperator = "<" |
                            ">" |
                            "<=" |
                            ">=" |
@@ -377,54 +395,67 @@ class JSParser extends RegexParsers {
                            "in"  
                          ;
 
-  val ShiftExpression = AdditiveExpression ~ rep(ShiftOperator ~ AdditiveExpression)
-                      ;
+  lazy val ShiftExpression = positioned(AdditiveExpression * (ShiftOperator ^^ makeBinaryOp)
+                      );
 
-  val Name = IdentifierName ~ rep("." ~ IdentifierName)
+  lazy val Name = rep1sep(IdentifierName, ".")
            ;
 
-  val BitwiseANDOperator = "&"
+  lazy val BitwiseANDOperator = "&"
                          ;
 
-  val ArrayLiteral = "[" ~ opt(Elision) ~ "]" |
-                           ElementList ~ Elision ~ "]" |
-                           opt(ElementList) ~ "]"  
-                   ;
+  lazy val ArrayLiteral = positioned("[" ~> opt(Elision) <~ "]" ^^ { AST.ArrayLiteral(_) } |
+                           "[" ~> ElementList ~ Elision <~ "]" ^^ { case a ~ b => AST.ArrayLiteral(Some(a ++ b)) } |
+                           "[" ~> opt(ElementList) <~ "]" ^^ { AST.ArrayLiteral(_) }  
+                   );
 
-  val EqualityExpressionNoIn = RelationalExpressionNoIn ~ rep(EqualityOperator ~ RelationalExpressionNoIn)
-                             ;
+  lazy val EqualityExpressionNoIn = positioned(RelationalExpressionNoIn * (EqualityOperator ^^ makeBinaryOp)
+                             );
 
-  val ShiftOperator = "<<" |
+  lazy val ShiftOperator = "<<" |
                       ">>" |
                       ">>>"  
                     ;
 
-  val PropertyNameAndValue = PropertyName ~ ":" ~ AssignmentExpression
+  lazy val PropertyNameAndValue = (PropertyName <~ ":") ~ AssignmentExpression ^^ { case a ~ b => AST.KVPair(a, b) }
                            ;
 
-  val LogicalORExpression = LogicalANDExpression ~ rep(LogicalOROperator ~ LogicalANDExpression)
-                          ;
+  lazy val LogicalORExpression = positioned(LogicalANDExpression * (LogicalOROperator ^^ makeBinaryOp)
+                          );
 
-  val BitwiseXORExpression = BitwiseANDExpression ~ rep(BitwiseXOROperator ~ BitwiseANDExpression)
-                           ;
+  lazy val BitwiseXORExpression = positioned(BitwiseANDExpression * (BitwiseXOROperator ^^ makeBinaryOp)
+                           );
 
-  val JScriptVarStatement = "var" ~ JScriptVarDeclarationList ~ opt(";")
-                          ;
+  //val JScriptVarStatement = positioned("var" ~> JScriptVarDeclarationList <~ opt(";") ^^ { AST.VariableStatement(_) }
+  //                        );
 
-  val WithStatement = "with" ~ "(" ~ Expression ~ ")" ~ Statement
-                    ;
+  lazy val WithStatement:Parser[AST.WithStatement] = positioned(("with" ~> "(" ~> Expression <~ ")") ~ Statement ^^ { case e ~ s => { AST.WithStatement(e, s) } }
+                    );
 
-  val JScriptVarDeclaration = Identifier ~ ":" ~ IdentifierName ~ opt(Initialiser)
-                            ;
+  //val JScriptVarDeclaration = positioned(Identifier ~ ":" ~ IdentifierName ~ opt(Initialiser)
+  //                          );
 
-  val IterationStatement = "do" ~ Statement ~ "while" ~ "(" ~ Expression ~ ")" ~ opt(";") |
-                           "while" ~ "(" ~ Expression ~ ")" ~ Statement |
-                           "for" ~ "(" ~ opt(ExpressionNoIn) ~ ";" ~ opt(Expression) ~ ";" ~ opt(Expression) ~ ")" ~ Statement |
-                           "for" ~ "(" ~ "var" ~ VariableDeclarationList ~ ";" ~ opt(Expression) ~ ";" ~ opt(Expression) ~ ")" ~ Statement |
-                           "for" ~ "(" ~ "var" ~ VariableDeclarationNoIn ~ "in" ~ Expression ~ ")" ~ Statement |
-                           "for" ~ "(" ~ LeftHandSideExpressionForIn ~ "in" ~ Expression ~ ")" ~ Statement  
-                         ;
+  lazy val IterationStatement:Parser[AST.Statement] = positioned(("do" ~> Statement) ~ (("while" ~> "(") ~> Expression <~ (")" <~ opt(";"))) ^^ { case s ~ e => AST.DoWhileStatement(e ,s) } |
+                           "while" ~> "(" ~> Expression ~ (")" ~> Statement) ^^ { case e ~ s => AST.WhileStatement(e, s) } |
+                           (("for" ~> "(" ~> opt(ExpressionNoIn)) ~ (";" ~> opt(Expression) <~ ";") ~ (opt(Expression) <~ ")") ~ Statement) ^^
+                           { case e1 ~ e2 ~ e3 ~ s => { AST.ForStatement(e1, e2, e3, s) } } |
+                           (("for" ~> "(" ~> "var" ~> VariableDeclarationList) ~ (";" ~> opt(Expression)) ~ (";" ~> opt(Expression) <~ ")") ~ Statement) ^^
+                           { case decl ~ e2 ~ e3 ~ s => { AST.ForStatement(Some(AST.VariableStatement(decl)), e2, e3, s) } } |
+                           (("for" ~> "(" ~> "var" ~> VariableDeclarationNoIn) ~ ("in" ~> Expression <~ ")") ~ Statement) ^^
+                           { case decl ~ e ~ s =>  { AST.ForInStatement(decl, e, s) } } |
+                           (("for" ~> "(" ~> LeftHandSideExpressionForIn) ~ ("in" ~> Expression <~ ")") ~ Statement) ^^
+                           { case lhs ~ e ~ s => { AST.ForInStatement(lhs, e, s) } }
+                         );
 
-  val IfStatement = "if" ~ "(" ~ Expression ~ ")" ~ Statement ~ opt("else" ~ Statement)
-                  ;
+  lazy val IfStatement:Parser[AST.IfStatement] = positioned(("if" ~> "(" ~> Expression <~ ")") ~ Statement ~ opt("else" ~> Statement) ^^ { case cond ~ i ~ e => { AST.IfStatement(cond, i, e) } }
+                  );
+  
+  def makeBinaryOp(op: String) =
+    (fact1: AST.Expression, fact2: AST.Expression) => AST.BinaryExpression(op, fact1, fact2)
+    
+  /* APPLY */
+  def apply(input: String): AST.Program = parseAll(Program, input) match {
+	  			case Success(result, _) => result
+	  			case failure: NoSuccess => scala.sys.error(failure.msg + " @ line %d:%d".format(failure.next.pos.line, failure.next.pos.column) + "\n" + failure.next.pos.longString)
+	  		}
 }
