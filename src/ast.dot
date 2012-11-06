@@ -1,0 +1,64 @@
+digraph G {
+	n26 [shape=record label="{DecimalLiteral|{value|5}}"];
+	n25 [shape=record label="{Identifier|{id|x}}"];
+	n24 [shape=record label="{AssignmentExpression|{op|+=}}"];
+	n23 [shape=record label="ExpressionList"];
+	n22 [shape=record label="ExpressionStatement"];
+	n21 [shape=record label="{StringLiteral|{value|whatever}}"];
+	n20 [shape=record label="{Identifier|{id|print}}"];
+	n19 [shape=record label="CallExpression"];
+	n18 [shape=record label="ExpressionList"];
+	n17 [shape=record label="ExpressionStatement"];
+	n16 [shape=record label="Block"];
+	n15 [shape=record label="{StringLiteral|{value|hello world}}"];
+	n14 [shape=record label="{Identifier|{id|print}}"];
+	n13 [shape=record label="CallExpression"];
+	n12 [shape=record label="ExpressionList"];
+	n11 [shape=record label="ExpressionStatement"];
+	n10 [shape=record label="Block"];
+	n9 [shape=record label="{DecimalLiteral|{value|6}}"];
+	n8 [shape=record label="{Identifier|{id|x}}"];
+	n7 [shape=record label="{BinaryExpression|{op|==}}"];
+	n6 [shape=record label="ExpressionList"];
+	n5 [shape=record label="IfStatement"];
+	n4 [shape=record label="{DecimalLiteral|{value|5}}"];
+	n3 [shape=record label="{Identifier|{id|x}}"];
+	n2 [shape=record label="VariableDeclaration"];
+	n1 [shape=record label="VariableStatement"];
+	n0 [shape=record label="Program"];
+
+	n0 -> n1 [label="elems"];
+	n1 -> n5 [label=""];
+	n5 -> n16 [label="elseBranch"];
+	n16 -> n17 [label="stmts"];
+	n17 -> n22 [label=""];
+	n22 -> n23 [label="expr"];
+	n23 -> n24 [label="lst"];
+	n24 -> n26 [label="rhs"];
+	n24 -> n25 [label="lhs"];
+	n17 -> n18 [label="expr"];
+	n18 -> n19 [label="lst"];
+	n19 -> n21 [label="args"];
+	n19 -> n20 [label="callable"];
+	n5 -> n10 [label="ifBranch"];
+	n10 -> n11 [label="stmts"];
+	n11 -> n12 [label="expr"];
+	n12 -> n13 [label="lst"];
+	n13 -> n15 [label="args"];
+	n13 -> n14 [label="callable"];
+	n5 -> n6 [label="cond"];
+	n6 -> n7 [label="lst"];
+	n7 -> n9 [label="t2"];
+	n7 -> n8 [label="t1"];
+	n1 -> n2 [label="decls"];
+	n2 -> n4 [label="value"];
+	n2 -> n3 [label="name"];
+
+	{ rank=same; n24 n19 n13 }
+	{ rank=same; n22 n17 n11 n7 n4 n3 }
+	{ rank=same; n23 n18 n12 n9 n8 }
+	{ rank=same; n5 n1 }
+	{ rank=same; n26 n25 n21 n20 n15 n14 }
+	{ rank=same; n16 n10 n6 n2 }
+	{ rank=same; n0 }
+}
