@@ -11,7 +11,15 @@ class GraphNode(name: String, attributes: List[(String, String)]) {
     if (attributes.length > 0) {
       res = "{%s".format(name)
       for ((attr, value) <- attributes) {
-        res += "|{%s|%s}".format(attr, value)
+        var newVal = value.stripPrefix("\"").stripSuffix("\"")
+        newVal = newVal.map(_ match { 
+          case '\'' => "&apos;"
+          case '"' => "&quot;"
+          case '<' => "&lt;"
+          case '>' => "&gt;"
+          case other => other toString
+        }) mkString;
+        res += "|{%s|%s}".format(attr, newVal)
       }
       res += "}"
     } else {
