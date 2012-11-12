@@ -2,49 +2,86 @@ import JSAnalyzer._
 import java.io._
 
 object JSAnalysis {
-	def analyzeDir(dir : File) : Unit = {
+	case class RuntimeOpts(printAst: Boolean = false, graphAst: Boolean = false, graphCfg: Boolean = false, files: List[String] = List()) {
+		override def toString() = "" + (if (printAst) "printAst " else "") + (if (graphAst) "graphAst " else "") + (if (graphCfg) "graphCfg " else "")
+	}
+
+	def analyzeDir(dir : File, opts : RuntimeOpts = RuntimeOpts()) : Unit = {
 		dir.listFiles().foreach((file) => {
 			if (file.isFile()){
-				analyze(file)
+				analyze(file, opts)
 			} else if (file.isDirectory()) {	
-				analyzeDir(file)
+				analyzeDir(file, opts)
 			}
 		})
 	}
 
-	def analyze(file: File) : Unit = {
-		println("Analyze: " + file.toString())
+	def splitFilename(f : File) : (String,String) = {
+		var dir = f.getParent() + "/"
+		var file = f.getName()
+		var idx = file.lastIndexOf('.')
+		var extension = if (idx >= 0)  file.substring(idx) else ""
+		var filename = if (idx >= 0) file.substring(0, idx) else file
+		(dir,filename)
 	}
 
-	def analyze(files : Array[String]) : Unit = {
-		files.foreach((f) => {
-			var file = new File(f)
-			if (file.isFile()){
-				analyze(file)
-			} else if (file.isDirectory()) {	
-				analyzeDir(file)
-			} else {
-				System.err.println("Couldn't analyze: " + f)
-			}
-		})
+	def analyze(file: File, opts : RuntimeOpts = RuntimeOpts()) : Unit = {
+
+		var (dir,filename) = splitFilename(file)
+
+		var ast = makeAst(file)
+
+		if (opts.printAst) printAST(ast, new PrintStream(dir + filename + ".ast"))
+
+		if (opts.graphAst) graphAST(ast, filename, dir)
+
+		//var cfg = 
+
+		//if (opts.graphCfg) graphCFG()
+
+		println("Analyze: " + file.getName())
 	}
 
-	def graphviz(cfg : CFG.ControlFlowGraph, filename : String, dir: String) = {
+	def makeAst(file: File) : AST.ASTNode = {
+		val source = scala.io.Source.fromFile(file)
+		val lines = source.mkString
+		source.close()
+		JSParser(lines)
+	}
+
+	def printAST(ast :AST.ASTNode, stream : PrintStream) : Unit = {
+		stream.print(ast)
+	}
+
+	def graphAST(ast : AST.ASTNode, filename : String, dir : String) : Unit = {
+		var printer = new GraphPrinter(ast)
+		printer.print(new PrintStream(dir + filename+".ast.dot"))
+		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".ast.gif " + dir + filename+".ast.dot")
+	}	
+
+	def graphCFG(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
 		GraphvizExporter.export(filename,cfg, new PrintStream(dir + filename+".dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".gif " + dir + filename+".dot")
 	}
 
 	def main(args : Array[String]) = {
-		analyze(args)
+		val opts = args.foldLeft(RuntimeOpts())((opts,arg) => arg match {
+			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.files)
+			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.files)
+			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphCfg, opts.graphAst, arg :: opts.files)
+		})
+		println("Running analysis with options: "+ opts.toString())
 
-		var cfg1 = List("edge1","edge2").foldLeft(ControlFlow.emptyCFG())((cfg,edge) => ControlFlow.append( cfg, CFG.EmptyNode(), Some(edge)))
-		graphviz(cfg1, "test1", "")
-		var cfg2 = List("edge4","edge5","edge6").foldLeft(ControlFlow.emptyCFG())((cfg,edge) => ControlFlow.append( cfg, CFG.EmptyNode(), Some(edge)))
-		graphviz(cfg2, "test2", "")
-		var cfg3 = List("edge7","edge8","edge9").foldLeft(ControlFlow.emptyCFG())((cfg,edge) => ControlFlow.append( cfg, CFG.EmptyNode(), Some(edge)))
-		graphviz(cfg3, "test3", "")
-
-		var cfg4 = ControlFlow.branchMerge(cfg1, List((cfg2,Some("CFG2")),(cfg3,Some("CFG3"))), CFG.Merge("Test Merge"))
-		graphviz(cfg4, "test4", "")
+		opts.files.foreach((f) => {
+			var file = new File(f)
+			if (file.isFile()){
+				analyze(file, opts)
+			} else if (file.isDirectory()) {	
+				analyzeDir(file, opts)
+			} else {
+				System.err.println("Couldn't analyze: " + f)
+			}
+		})
 	}
 }

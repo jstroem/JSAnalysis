@@ -43,27 +43,27 @@ class GraphPrinter(start: AST.ASTNode) {
 
   var counter = 0
 
-  def print() = {
+  def print(export: java.io.PrintStream = System.out) = {
     start.graphPrint(this, 0)
 
-    println("digraph G {")
+    export.println("digraph G {")
     for (node <- nodes) {
-      println("\t%s [shape=record label=\"%s\"];".format(node.id, node.makeLabel()))
+      export.println("\t%s [shape=record label=\"%s\"];".format(node.id, node.makeLabel()))
     }
 
-    println("")
+    export.println("")
 
     for (link <- links) {
-      println("\t%s -> %s [label=\"%s\"];".format(link.from.id, link.to.id, link.label))
+      export.println("\t%s -> %s [label=\"%s\"];".format(link.from.id, link.to.id, link.label))
     }
 
-    println("")
+    export.println("")
 
     ranks.foreach {
-      case (key, value) => println("\t{ rank=same; %s }".format(value.map(_.id).reduceLeft(_ + " " + _)))
+      case (key, value) => export.println("\t{ rank=same; %s }".format(value.map(_.id).reduceLeft(_ + " " + _)))
     }
 
-    println("}")
+    export.println("}")
   }
 
   def addNode(name: String, attributes: List[(String, String)], level: Int) = {

@@ -47,8 +47,7 @@ object ControlFlow {
 		label match {
 			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)))
 			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels)
-		}
-		
+		}	
 	}
 
 	def concat(cfg1 : CFG.ControlFlowGraph, cfg2: CFG.ControlFlowGraph, label: Option[String] = None ) : CFG.ControlFlowGraph = {
@@ -118,9 +117,9 @@ object ControlFlow {
 			branchMerge(expression(e) > CFG.If(e), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If Merge"))
 		}
 		case AST.WhileStatement(e, s) => throw NotImplementedException()
-		case AST.DoWhileStatement() => throw NotImplementedException()
+		case AST.DoWhileStatement(_,_) => throw NotImplementedException()
 		case AST.ForStatement(_,_,_,_) => throw NotImplementedException()
-		case AST.ForInStatement() => throw NotImplementedException()
+		case AST.ForInStatement(_,_,_) => throw NotImplementedException()
 		case AST.ContinueStatement(oi) => throw NotImplementedException()
 		case AST.BreakStatement(i) => throw NotImplementedException()
 		case AST.ReturnStatement(oe) => throw NotImplementedException()
