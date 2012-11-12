@@ -1,5 +1,11 @@
 *.class
 *.log
+*.ast.dot
+*.cfg.dot
+*.dot
+*.ast.gif
+*.cfg.gif
+*.ast
 
 # sbt specific
 dist/*
