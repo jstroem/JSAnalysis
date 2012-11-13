@@ -27,7 +27,7 @@ object GraphvizExporter {
 
  	def nodeToString( n : CFG.ControlFlowNode ) : String = n match {
  		case CFG.EmptyNode(s) => "["+ s + "] EmptyNode"
- 		case CFG.Return() => "["+ n.hashCode() + "] Return"
+ 		case CFG.Return(oe) => "["+ n.hashCode() + "] Return" + oe
  		case CFG.Merge(l) => "["+ n.hashCode() + "] Merge: "+ l
  		case CFG.Continue(i) => "["+ n.hashCode() + "] Continue: " + i
  		case CFG.If(e) => "["+ n.hashCode() + "] If: " + e

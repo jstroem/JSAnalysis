@@ -9,7 +9,7 @@ object AST {
 	}
 
 	def printList(ls : List[Any], prefix: String = "") = ls.headOption match {
-	 	case Some(n) => ls.drop(1).foldLeft(n.toString())((str,n) => str + ", " + n.toString())
+	 	case Some(n) => ls.drop(1).foldLeft(n.toString())((str,n) => n.toString() + str + ", ")
 	 	case None => ""
 	}
 
@@ -256,7 +256,7 @@ object AST {
 	    n
 	  }
 
-	  override def toString() = "var " + printList(vds,",") + ";"
+	  override def toString() = "var " + printList(vds,",")
 	}
 	case class EmptyStatement() extends Statement {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
@@ -271,7 +271,7 @@ object AST {
 	    graphLink(printer, level, n, e, "expr")
 	    n
 	  }
-	  override def toString() = e.toString() + ";"
+	  override def toString() = e.toString()
 	}
 
 	case class IfStatement(e:Expression,s1: Statement,s2:Option[Statement]) extends Statement {
@@ -467,7 +467,7 @@ object AST {
 	  	case None => ""
 	  })
 	}
-	case class CaseBlock(ccs:List[ASTNode]) extends ASTNode {
+	case class CaseBlock(ccs:List[Case]) extends ASTNode {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
 	    val n = printer.addNode("CaseBlock", Nil, level)
 	    graphList(printer, level, n, ccs, "cases")
@@ -476,7 +476,10 @@ object AST {
 
 	  override def toString() = "{ "+printList(ccs) +" }"
 	}
-	case class CaseClause(e:Expression,ss: Option[List[Statement]]) extends ASTNode {
+
+	abstract class Case() extends ASTNode 
+
+	case class CaseClause(e:Expression,ss: Option[List[Statement]]) extends Case {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
 	    val n = printer.addNode("CaseClause", Nil, level)
 	    graphLink(printer, level, n, e, "expr")
@@ -487,7 +490,7 @@ object AST {
 	  override def toString() = "case " + e.toString() +": " + printOptList(ss)
 	}
 
-	case class DefaultClause(ss: Option[List[Statement]]) extends ASTNode {
+	case class DefaultClause(ss: Option[List[Statement]]) extends Case {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
 	    val n = printer.addNode("DefaultClause", Nil, level)
 	    ss.foreach(graphList(printer, level, n, _, "stmts"))
@@ -529,7 +532,7 @@ object AST {
 	  }
 
 	  override def toString() = a match {
-	  	case Some(se) => se.foldLeft("")((s,res) => res + s.toString())
+	  	case Some(se) => se.foldLeft("")((s,res) => s.toString() + res)
 	  	case None => ""
 	  }
 	}

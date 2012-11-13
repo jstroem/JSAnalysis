@@ -26,23 +26,18 @@ object JSAnalysis {
 	}
 
 	def analyze(file: File, opts : RuntimeOpts = RuntimeOpts()) : Unit = {
-
+		println("Analyze: " + file.getName())
 		var (dir,filename) = splitFilename(file)
 
 		var ast = makeAst(file)
-
 		if (opts.printAst) printAST(ast, new PrintStream(dir + filename + ".ast"))
-
 		if (opts.graphAst) graphAST(ast, filename, dir)
 
-		//var cfg = 
-
-		//if (opts.graphCfg) graphCFG()
-
-		println("Analyze: " + file.getName())
+		var cfg = ControlFlow.program( ast )
+		if (opts.graphCfg) graphCFG(cfg, filename, dir)
 	}
 
-	def makeAst(file: File) : AST.ASTNode = {
+	def makeAst(file: File) : AST.Program = {
 		val source = scala.io.Source.fromFile(file)
 		val lines = source.mkString
 		source.close()
@@ -60,8 +55,8 @@ object JSAnalysis {
 	}	
 
 	def graphCFG(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-		GraphvizExporter.export(filename,cfg, new PrintStream(dir + filename+".dot"))
-		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".gif " + dir + filename+".dot")
+		GraphvizExporter.export(filename,cfg, new PrintStream(dir + filename+".cfg.dot"))
+		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cfg.gif " + dir + filename+".cfg.dot")
 	}
 
 	def main(args : Array[String]) = {
@@ -69,7 +64,7 @@ object JSAnalysis {
 			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.files)
 			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.files)
 			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.files)
-			case _ => RuntimeOpts(opts.printAst, opts.graphCfg, opts.graphAst, arg :: opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, arg :: opts.files)
 		})
 		println("Running analysis with options: "+ opts.toString())
 

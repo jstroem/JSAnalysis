@@ -5,14 +5,23 @@ import java.util.UUID
 object CFG {
 
 	abstract class ControlFlowNode()
-	case class ControlFlowASTNode(ASTel:Any = null) extends ControlFlowNode
+	// Each statement has their own type 
 	case class Merge(label:String) extends ControlFlowNode
-	case class Continue(i:AST.Identifier) extends ControlFlowNode
-	case class Return() extends ControlFlowNode
+	case class Continue(i:Option[AST.Identifier]) extends ControlFlowNode
+	case class Return(e : Option[AST.Expression]) extends ControlFlowNode
 	case class Expression(e:AST.Expression) extends ControlFlowNode
-	case class Assignments(i:AST.Identifier,e:AST.Expression) extends ControlFlowNode
+	case class Assignment(i:AST.Identifier,e:Option[AST.Expression]) extends ControlFlowNode
 	case class If(e:AST.Expression) extends ControlFlowNode
-	case class ThrowNode(e:AST.Expression) extends ControlFlowNode
+	case class While(e : AST.Expression) extends ControlFlowNode
+	case class ForIn(e1 : AST.ASTNode, e2 : AST.Expression) extends ControlFlowNode
+	case class Throw(e : AST.Expression) extends ControlFlowNode
+	case class With(e : AST.Expression) extends ControlFlowNode
+	case class Switch(e : AST.Expression) extends ControlFlowNode
+	case class Catch(i : AST.Identifier) extends ControlFlowNode 
+	abstract class Case() extends ControlFlowNode
+	case class CaseClause(e : AST.Expression) extends Case
+	case class DefaultClause() extends Case
+	case class Break() extends ControlFlowNode
 	case class EmptyNode(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 
 	case class ControlFlowGraph(
@@ -24,6 +33,7 @@ object CFG {
 	) {
 		def +(el: ControlFlowNode ) = ControlFlow.append( this, el )
 		def ::(cfg: ControlFlowGraph ) = ControlFlow.concat( this, cfg )
+		def <(el : ControlFlowNode ) = ControlFlow.addNode(this, el)
 
 		def >(el: ControlFlowNode) = ControlFlow.prepend( this, el )
 	}
@@ -36,6 +46,10 @@ object ControlFlow {
 	/******************************/
 	/******** HELPER METHODS ******/
 	/******************************/
+	def addNode( cfg: CFG.ControlFlowGraph, el: CFG.ControlFlowNode ) : CFG.ControlFlowGraph = {
+		CFG.ControlFlowGraph(cfg.start,cfg.end,el :: cfg.nodes,cfg.edges, cfg.labels)
+	}
+
 	def append( cfg : CFG.ControlFlowGraph, el : CFG.ControlFlowNode,label: Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
 			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++ Map(((el,cfg.start),label)))
@@ -70,8 +84,11 @@ object ControlFlow {
 	}
 
 	def emptyCFG() : CFG.ControlFlowGraph = {
-		var e = CFG.EmptyNode()
-		CFG.ControlFlowGraph(e,e,List(e))
+		singleCFG(CFG.EmptyNode())
+	}
+
+	def singleCFG( n : CFG.ControlFlowNode ) : CFG.ControlFlowGraph = {
+		CFG.ControlFlowGraph(n,n,List(n))
 	}
 
 	def branchMerge(cfg: CFG.ControlFlowGraph, branches: List[(CFG.ControlFlowGraph,Option[String])], mergePoint: CFG.ControlFlowNode ) : CFG.ControlFlowGraph = {
@@ -98,6 +115,25 @@ object ControlFlow {
 		}
 	}
 
+	def makeEdge(cfg : CFG.ControlFlowGraph, from: CFG.ControlFlowNode, to: CFG.ControlFlowNode, label: Option[String] ) : CFG.ControlFlowGraph = {
+		label match {
+			case Some(label) => CFG.ControlFlowGraph(
+				cfg.start,
+				cfg.end,
+				cfg.nodes,
+				(from,to) :: cfg.edges,
+				cfg.labels ++ Map(((from,to),label))
+			)
+			case None => CFG.ControlFlowGraph(
+				cfg.start,
+				cfg.end,
+				cfg.nodes,
+				(from,to) :: cfg.edges,
+				cfg.labels
+			)
+		}
+	} 
+
 	/******************************/
 	/*** Recursivly walkthrough ***/
 	/******************************/
@@ -106,7 +142,9 @@ object ControlFlow {
 			case Some(sl) => statements( sl )
 			case None => emptyCFG()
 		}
-		case AST.VariableStatement(vds) => throw NotImplementedException()
+		case AST.VariableStatement(vds) => {
+			vds.foldLeft(emptyCFG())((cfg,vd) => singleCFG(CFG.Assignment(vd.i,vd.a)) :: cfg)
+		}
 		case AST.EmptyStatement() => throw NotImplementedException()
 		case AST.ExpressionStatement(e) => expression(e)
  		case AST.IfStatement(e,s1,os2) => {
@@ -114,30 +152,151 @@ object ControlFlow {
 				case Some(s2) => statement( s2 )
 				case None => emptyCFG()
 			}
-			branchMerge(expression(e) > CFG.If(e), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If Merge"))
+			branchMerge(singleCFG(CFG.If(e)), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If Merge"))
 		}
-		case AST.WhileStatement(e, s) => throw NotImplementedException()
-		case AST.DoWhileStatement(_,_) => throw NotImplementedException()
-		case AST.ForStatement(_,_,_,_) => throw NotImplementedException()
-		case AST.ForInStatement(_,_,_) => throw NotImplementedException()
-		case AST.ContinueStatement(oi) => throw NotImplementedException()
-		case AST.BreakStatement(i) => throw NotImplementedException()
-		case AST.ReturnStatement(oe) => throw NotImplementedException()
-		case AST.WithStatement(e,s) => throw NotImplementedException()
+		case AST.WhileStatement(e, s) => {
+			var check = singleCFG(CFG.While(e))
+			var stmt = statement(s)
+			var cfg = (check :: stmt) 
+			makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While merge")
+		}
+		case AST.DoWhileStatement(e,s) => {
+			var stmt2 = statement(s)
+			var check = singleCFG(CFG.While(e))
+			var stmt = statement(s)
+			var cfg = (check :: stmt) 
+			stmt2 :: (makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While merge"))
+		}
+		case AST.ForStatement(oe1,oe2,oe3,s) => {
+			var init = oe1 match {
+				case Some(e) => e match {
+					case e : AST.Expression => singleCFG(CFG.Expression(e))
+					case e : AST.Statement => statement(e)
+					case _ => throw NotImplementedException("Initial in for statment of unknown character")
+				}
+				case None => emptyCFG()
+			}
+			var check = oe2 match {
+				case Some(e) => singleCFG(CFG.While(e))
+				case None => singleCFG(CFG.While(AST.BooleanLiteral(true)))
+			}
+			var e3 = oe3 match {
+				case Some(e) => singleCFG(CFG.Expression(e))
+				case None => emptyCFG()
+			} 
+			var cfg = check :: (statement(s) :: e3) 
+			init :: (makeEdge(cfg,cfg.end, cfg.start, Some("Loop")) > CFG.Merge("While merge"))
+		}
+		case AST.ForInStatement(e1,e2,s) => {
+			var cfg = singleCFG(CFG.ForIn(e1,e2)) :: statement(s)
+			makeEdge(cfg,cfg.end,cfg.start, Some("Loop")) > CFG.Merge("ForIn Merge")
+		}
 		case AST.LabelledStatement(i,s) => throw NotImplementedException()
-		case AST.SwitchStatement(e,cb) => throw NotImplementedException()
-		case AST.ThrowStatement(e) => throw NotImplementedException()
-		case AST.TryStatement(b,oc,of) => throw NotImplementedException()
+		case AST.SwitchStatement(e,cb) => {
+			var endNode = CFG.Merge("Switch Merge")
+			var cfg = singleCFG(CFG.Switch(e)) < endNode
+			caseBlock(cb, cfg, endNode)
+		}
+			
+		case AST.TryStatement(b,oc,of) => {
+			b.sl match {
+				case Some(ss) => (oc,of) match {
+					case (None,None) => statements(ss)
+					case (None,Some(b)) => b.sl match {
+						case None => statements(ss)
+						case Some(ss2) => statements(ss2) :: statements(ss)
+					}
+					case (Some(c),None) => catchBlock(c, statements(ss))
+					case (Some(c),Some(b)) => b.sl match {
+						case None => catchBlock(c, statements(ss))
+						case Some(ss2) => catchBlock(c, statements(ss2) :: statements(ss))
+					}
+				}
+				case None => of match {
+					case Some(b) => b.sl match {
+						case Some(ss) => statements(ss)
+						case None => emptyCFG()
+					}
+					case None => emptyCFG()
+				}
+			}
+		}
+		case AST.ContinueStatement(oi) => singleCFG(CFG.Continue(oi))
+		case AST.BreakStatement(i) => singleCFG(CFG.Break())
+		case AST.ReturnStatement(oe) => singleCFG(CFG.Return(oe))
+		case AST.ThrowStatement(e) => singleCFG(CFG.Throw(e))
+		case AST.WithStatement(e,s) => singleCFG(CFG.With(e)) :: statement(s)
 	}
 
 	def statements(ss : List[AST.Statement] ) : CFG.ControlFlowGraph = {
-		ss.foldLeft(emptyCFG)((cfg,add) => cfg :: statement(add))
+		ss.foldLeft(emptyCFG)((cfg,add) => statement(add) :: cfg)
+	}
+
+	def catchBlock(c : AST.Catch, cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
+		c.b.sl match {
+			case None => cfg < CFG.Catch(c.i)
+			case Some(ss) => throw NotImplementedException("Catch block not impl.")
+		}
+	} 
+
+	def caseBlock(cb : AST.CaseBlock, cfg : CFG.ControlFlowGraph, endNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
+		// TODO Should go through each statment and remove breaks
+		var (cbs,temps) = cb.ccs.foldLeft((List[(List[CFG.ControlFlowNode],CFG.ControlFlowGraph)](),List[ CFG.ControlFlowNode ]()))((res,cc) => {
+			var (fin,temp) = res
+			cc match {
+				case AST.CaseClause(e, sso) => {
+					sso match {
+						case Some(ss) => ((CFG.CaseClause(e) :: temp,statements(ss)) :: fin,List())
+						case None => (fin,CFG.CaseClause(e) :: temp)
+					}
+				}
+				case AST.DefaultClause(sso) => {
+					sso match {
+						case Some(ss) => ((CFG.DefaultClause() :: temp,statements(ss)) :: fin,List())
+						case None => (fin,CFG.DefaultClause() :: temp)
+					}
+				}
+			}
+		})
+		cbs.foldLeft(cfg)((res,cbs) => {
+			var (cc, statement) = cbs
+			var nCfg = CFG.ControlFlowGraph(
+				res.start,
+				endNode,
+				cfg.nodes ::: statement.nodes, 
+				(statement.end,endNode) :: cfg.edges ::: statement.edges,
+				cfg.labels ++ statement.labels
+			)
+			cc.foldLeft(nCfg)((cfg,c) => {
+				makeEdge(makeEdge((cfg < c),cfg.start,c,None),c,statement.start,None)
+			})
+		})
 	}
 
 	def expression( e:AST.Expression ) : CFG.ControlFlowGraph = e match {
-		case _ => { //TODO: Should really check if the e has any sideeffects
+		case _ => {
 			var n = CFG.Expression(e)
 			CFG.ControlFlowGraph(n,n, List(n))
 		}
+	}
+
+	def functionDeclaration( fd : AST.FunctionDeclaration ) : CFG.ControlFlowGraph = {
+		emptyCFG() //TODO
+	}
+
+	def sourceElements( ses : List[AST.SourceElement] ) : CFG.ControlFlowGraph = {
+		ses.foldLeft(emptyCFG)((cfg,se) => sourceElement(se) :: cfg)
+	}
+	
+	def sourceElement( se : AST.SourceElement ) : CFG.ControlFlowGraph = {
+		se match {
+			case se : AST.Statement => statement( se )
+			case se : AST.FunctionDeclaration => functionDeclaration( se )
+		}
+	}
+
+	def program( p : AST.Program ) : CFG.ControlFlowGraph = p.a match {
+		case Some(se) => sourceElements(se)
+		case None => emptyCFG()
 	}
 }

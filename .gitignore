@@ -6,6 +6,7 @@
 *.ast.gif
 *.cfg.gif
 *.ast
+*.DS_Store
 
 # sbt specific
 dist/*
