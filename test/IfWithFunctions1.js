@@ -1,7 +1,7 @@
 var x = 5;
 if (x == 6) {
-  print("hello world");
+  console.log("hello world");
 } else {
-  print("whatever"); x += 5;
+  console.log("whatever"); x += 5;
 }
 
