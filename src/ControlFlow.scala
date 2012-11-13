@@ -2,27 +2,38 @@ package JSAnalyzer
 
 import java.util.UUID
 
+/** TODO: Check following works:
+	For
+	While
+	ForIn
+	DoWhile
+	Switch
+	Try Catch
+
+	Remove Empty nodes
+**/
+
 object CFG {
 
 	abstract class ControlFlowNode()
 	// Each statement has their own type 
-	case class Merge(label:String) extends ControlFlowNode
-	case class Continue(i:Option[AST.Identifier]) extends ControlFlowNode
-	case class Return(e : Option[AST.Expression]) extends ControlFlowNode
-	case class Expression(e:AST.Expression) extends ControlFlowNode
-	case class Assignment(i:AST.Identifier,e:Option[AST.Expression]) extends ControlFlowNode
-	case class If(e:AST.Expression) extends ControlFlowNode
-	case class While(e : AST.Expression) extends ControlFlowNode
-	case class ForIn(e1 : AST.ASTNode, e2 : AST.Expression) extends ControlFlowNode
-	case class Throw(e : AST.Expression) extends ControlFlowNode
-	case class With(e : AST.Expression) extends ControlFlowNode
-	case class Switch(e : AST.Expression) extends ControlFlowNode
-	case class Catch(i : AST.Identifier) extends ControlFlowNode 
-	abstract class Case() extends ControlFlowNode
-	case class CaseClause(e : AST.Expression) extends Case
-	case class DefaultClause() extends Case
-	case class Break() extends ControlFlowNode
-	case class EmptyNode(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Merge(label:String, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Continue(i:Option[AST.Identifier], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Return(e : Option[AST.Expression], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Expression(e:AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Assignment(i:AST.Identifier,e:Option[AST.Expression], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class If(e:AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class While(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class ForIn(e1 : AST.ASTNode, e2 : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Throw(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class With(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Switch(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Catch(i : AST.Identifier, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	abstract class Case() extends ControlFlowNode()
+	case class CaseClause(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends Case
+	case class DefaultClause(id: String = UUID.randomUUID().toString()) extends Case
+	case class Break(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Empty(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 
 	case class ControlFlowGraph(
 		start : ControlFlowNode, 
@@ -84,7 +95,7 @@ object ControlFlow {
 	}
 
 	def emptyCFG() : CFG.ControlFlowGraph = {
-		singleCFG(CFG.EmptyNode())
+		singleCFG(CFG.Empty())
 	}
 
 	def singleCFG( n : CFG.ControlFlowNode ) : CFG.ControlFlowGraph = {
@@ -273,12 +284,7 @@ object ControlFlow {
 		})
 	}
 
-	def expression( e:AST.Expression ) : CFG.ControlFlowGraph = e match {
-		case _ => {
-			var n = CFG.Expression(e)
-			CFG.ControlFlowGraph(n,n, List(n))
-		}
-	}
+	def expression( e:AST.Expression ) : CFG.ControlFlowGraph = singleCFG(CFG.Expression(e))
 
 	def functionDeclaration( fd : AST.FunctionDeclaration ) : CFG.ControlFlowGraph = {
 		emptyCFG() //TODO
