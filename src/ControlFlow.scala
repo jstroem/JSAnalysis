@@ -4,7 +4,6 @@ import java.util.UUID
 
 /** TODO: Check following works:
 	For
-	While
 	ForIn
 	DoWhile
 	Switch
@@ -163,20 +162,21 @@ object ControlFlow {
 				case Some(s2) => statement( s2 )
 				case None => emptyCFG()
 			}
-			branchMerge(singleCFG(CFG.If(e)), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If Merge"))
+			branchMerge(singleCFG(CFG.If(e)), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If"))
 		}
 		case AST.WhileStatement(e, s) => {
-			var check = singleCFG(CFG.While(e))
+			var check = CFG.While(e)
 			var stmt = statement(s)
-			var cfg = (check :: stmt) 
-			makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While merge")
+			var cfg = append(statement(s),check,Some("True"))
+			var end = CFG.Merge("While")
+			makeEdge(makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > end,check,end,Some("False"))
 		}
 		case AST.DoWhileStatement(e,s) => {
 			var stmt2 = statement(s)
 			var check = singleCFG(CFG.While(e))
 			var stmt = statement(s)
 			var cfg = (check :: stmt) 
-			stmt2 :: (makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While merge"))
+			stmt2 :: (makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While"))
 		}
 		case AST.ForStatement(oe1,oe2,oe3,s) => {
 			var init = oe1 match {
@@ -195,16 +195,16 @@ object ControlFlow {
 				case Some(e) => singleCFG(CFG.Expression(e))
 				case None => emptyCFG()
 			} 
-			var cfg = check :: (statement(s) :: e3) 
-			init :: (makeEdge(cfg,cfg.end, cfg.start, Some("Loop")) > CFG.Merge("While merge"))
+			var cfg = ((statement(s) :: e3) :: check) > CFG.Merge("While")
+			(makeEdge(cfg,cfg.end, cfg.start, Some("Loop"))) :: init
 		}
 		case AST.ForInStatement(e1,e2,s) => {
 			var cfg = singleCFG(CFG.ForIn(e1,e2)) :: statement(s)
-			makeEdge(cfg,cfg.end,cfg.start, Some("Loop")) > CFG.Merge("ForIn Merge")
+			makeEdge(cfg,cfg.end,cfg.start, Some("Loop")) > CFG.Merge("ForIn")
 		}
 		case AST.LabelledStatement(i,s) => throw NotImplementedException()
 		case AST.SwitchStatement(e,cb) => {
-			var endNode = CFG.Merge("Switch Merge")
+			var endNode = CFG.Merge("Switch")
 			var cfg = singleCFG(CFG.Switch(e)) < endNode
 			caseBlock(cb, cfg, endNode)
 		}

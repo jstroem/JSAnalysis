@@ -34,22 +34,32 @@ object GraphvizExporter {
  		}
  		case CFG.Return(oe,id) => oe match {
  			case None => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Return: (No expression)}")
- 			case Some(e) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Return: "+e+"}")
+ 			case Some(e) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Return: "+expToString(e)+"}")
  		}
- 		case CFG.Expression(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Expression: "+e+"}")
+ 		case CFG.Expression(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Expression: "+expToString(e)+"}")
  		case CFG.Assignment(i,oe,id) => oe match {
  			case None => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Assignment: "+i+" = (no expression)}")
- 			case Some(e) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Assignment: "+i+" = "+e+"}")
+ 			case Some(e) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Assignment: "+i+" = "+expToString(e)+"}")
  		}
- 		case CFG.If(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{If: "+e+"}")
- 		case CFG.While(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{While: "+e+"}")
- 		case CFG.ForIn(e1, e2, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{ForIn: "+e1+" in "+e2+"}")
- 		case CFG.Throw(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Throw: "+e+"}")
- 		case CFG.With(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{With: "+e+"}")
- 		case CFG.Switch(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Switch: "+e+"}")
+ 		case CFG.If(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{If: "+expToString(e)+"}")
+ 		case CFG.While(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{While: "+expToString(e)+"}")
+ 		case CFG.ForIn(e1, e2, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{ForIn: "+expToString(e1)+" in "+expToString(e2)+"}")
+ 		case CFG.Throw(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Throw: "+expToString(e)+"}")
+ 		case CFG.With(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{With: "+expToString(e)+"}")
+ 		case CFG.Switch(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Switch: "+expToString(e)+"}")
  		case CFG.Catch(i,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Catch: "+i+"}")
- 		case CFG.CaseClause(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Case: "+e+"}")
+ 		case CFG.CaseClause(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Case: "+expToString(e)+"}")
  		case CFG.DefaultClause(id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Default Case}")
+	 }
+
+	 def expToString( e : AST.ASTNode ) : String = {
+	 	e.toString().map(_ match { 
+          case '\'' => "&apos;"
+          case '"' => "&quot;"
+          case '<' => "&lt;"
+          case '>' => "&gt;"
+          case other => other toString
+        }) mkString;
 	 }
 
 	 def nodeToId( n : CFG.ControlFlowNode ) : String = n match {
