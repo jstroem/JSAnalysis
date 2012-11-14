@@ -2,14 +2,15 @@ package JSAnalyzer
 
 import java.util.UUID
 
-/** TODO: Check following works:
-	For
-	ForIn
-	DoWhile
-	Switch
-	Try Catch
+/** TODO: 
+ 	* Check following works:
+		* ForIn
+		* Switch
 
-	Remove Empty nodes
+	* Remove Empty nodes
+	* functionDeclaration
+	* CaseBlocks should be walked though and if a break is caught this should be updated
+	* Continue needs to be dealt with
 **/
 
 object CFG {
@@ -22,7 +23,7 @@ object CFG {
 	case class Expression(e:AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class Assignment(i:AST.Identifier,e:Option[AST.Expression], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class If(e:AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
-	case class While(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class DoWhile(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class ForIn(e1 : AST.ASTNode, e2 : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class Throw(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class With(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
@@ -51,6 +52,7 @@ object CFG {
 
 
 case class NotImplementedException(s:String="")  extends Exception
+case class NotSupportedException(s:String="")  extends Exception
 
 object ControlFlow {
 	/******************************/
@@ -165,38 +167,37 @@ object ControlFlow {
 			branchMerge(singleCFG(CFG.If(e)), List((statement(s1),Some("True")),(cfg2,Some("False"))), CFG.Merge("If"))
 		}
 		case AST.WhileStatement(e, s) => {
+			/* This works but as discused in lection 12 it can be made as a do while which is easier to optimize
 			var check = CFG.While(e)
 			var stmt = statement(s)
 			var cfg = append(statement(s),check,Some("True"))
 			var end = CFG.Merge("While")
-			makeEdge(makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > end,check,end,Some("False"))
+			makeEdge(makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > end,check,end,Some("False"))*/
+			statement( AST.IfStatement(e, AST.DoWhileStatement(e,s), None ) )
 		}
 		case AST.DoWhileStatement(e,s) => {
-			var stmt2 = statement(s)
-			var check = singleCFG(CFG.While(e))
-			var stmt = statement(s)
-			var cfg = (check :: stmt) 
-			stmt2 :: (makeEdge(cfg,cfg.end,cfg.start,Some("Loop")) > CFG.Merge("While"))
+			var cfg = (statement(s) > CFG.DoWhile(e)) + CFG.Merge("While")
+			makeEdge(cfg,cfg.end,cfg.start,Some("Loop"))
 		}
 		case AST.ForStatement(oe1,oe2,oe3,s) => {
+			// Converts this into a while statement 
 			var init = oe1 match {
 				case Some(e) => e match {
-					case e : AST.Expression => singleCFG(CFG.Expression(e))
-					case e : AST.Statement => statement(e)
-					case _ => throw NotImplementedException("Initial in for statment of unknown character")
+					case e : AST.Expression => AST.ExpressionStatement(e)
+					case e : AST.Statement => e
+					case _ => throw NotImplementedException("This is regarding issue #1 at github")
 				}
-				case None => emptyCFG()
+				case None => AST.EmptyStatement()
 			}
 			var check = oe2 match {
-				case Some(e) => singleCFG(CFG.While(e))
-				case None => singleCFG(CFG.While(AST.BooleanLiteral(true)))
+				case Some(e) => e
+				case None => AST.BooleanLiteral(true)
 			}
-			var e3 = oe3 match {
-				case Some(e) => singleCFG(CFG.Expression(e))
-				case None => emptyCFG()
-			} 
-			var cfg = ((statement(s) :: e3) :: check) > CFG.Merge("While")
-			(makeEdge(cfg,cfg.end, cfg.start, Some("Loop"))) :: init
+			var inc = oe3 match {
+				case Some(e) => AST.ExpressionStatement(e)
+				case None => AST.EmptyStatement()
+			}
+			statements( List(init, AST.WhileStatement(check, AST.Block( Some(List( s, inc ) )) ) ) )
 		}
 		case AST.ForInStatement(e1,e2,s) => {
 			var cfg = singleCFG(CFG.ForIn(e1,e2)) :: statement(s)
@@ -210,6 +211,8 @@ object ControlFlow {
 		}
 			
 		case AST.TryStatement(b,oc,of) => {
+			throw NotSupportedException("Try Statements is not support (Regarding issue #2 at Github)")
+			/** This might work but because of the lack of time/info this is unsupported for now
 			b.sl match {
 				case Some(ss) => (oc,of) match {
 					case (None,None) => statements(ss)
@@ -230,12 +233,17 @@ object ControlFlow {
 					}
 					case None => emptyCFG()
 				}
-			}
+			} **/
 		}
 		case AST.ContinueStatement(oi) => singleCFG(CFG.Continue(oi))
 		case AST.BreakStatement(i) => singleCFG(CFG.Break())
 		case AST.ReturnStatement(oe) => singleCFG(CFG.Return(oe))
-		case AST.ThrowStatement(e) => singleCFG(CFG.Throw(e))
+		case AST.ThrowStatement(e) => {
+			throw NotSupportedException("Try Statements is not support (Regarding issue #2 at Github)")
+			/** This might work but because of the lack of time/info this is unsupported for now
+			singleCFG(CFG.Throw(e))
+			**/
+		}
 		case AST.WithStatement(e,s) => singleCFG(CFG.With(e)) :: statement(s)
 	}
 

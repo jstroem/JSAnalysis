@@ -42,7 +42,7 @@ object GraphvizExporter {
  			case Some(e) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Assignment: "+i+" = "+expToString(e)+"}")
  		}
  		case CFG.If(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{If: "+expToString(e)+"}")
- 		case CFG.While(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{While: "+expToString(e)+"}")
+ 		case CFG.DoWhile(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{While: "+expToString(e)+"}")
  		case CFG.ForIn(e1, e2, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{ForIn: "+expToString(e1)+" in "+expToString(e2)+"}")
  		case CFG.Throw(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Throw: "+expToString(e)+"}")
  		case CFG.With(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{With: "+expToString(e)+"}")
@@ -71,7 +71,7 @@ object GraphvizExporter {
  		case CFG.Expression(_, id) => id
  		case CFG.Assignment(_,_,id) => id 
  		case CFG.If(_, id) => id 
- 		case CFG.While(_, id) => id 
+ 		case CFG.DoWhile(_, id) => id 
  		case CFG.ForIn(_, _, id) => id
  		case CFG.Throw(_,id) => id 
  		case CFG.With(_,id) => id 
