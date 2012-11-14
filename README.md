@@ -16,6 +16,9 @@ An example could be
 	
 	scala JSAnalysis -print-ast -graph-ast ../test/*.js
 
+#Restrictions
+The analysis will only be able to check one javascript and its not valid in this to overload (redefine) functions. This is also commented in issue #3 
+
 #TODO
 Todolist in each part
 
