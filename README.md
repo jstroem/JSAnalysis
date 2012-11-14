@@ -21,10 +21,8 @@ Todolist in each part
 
 ##CFG
 * Check following works:
-	* ForIn
 	* Switch
-
 * Remove Empty nodes
 * functionDeclaration
 * CaseBlocks should be walked though and if a break is caught this should be updated
-* Continue needs to be dealt with
+* Continue and breaks needs to be dealt with

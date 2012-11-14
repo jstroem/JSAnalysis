@@ -4,17 +4,15 @@ import java.util.UUID
 
 /** TODO: 
  	* Check following works:
-		* ForIn
 		* Switch
 
 	* Remove Empty nodes
 	* functionDeclaration
 	* CaseBlocks should be walked though and if a break is caught this should be updated
-	* Continue needs to be dealt with
+	* Continue and breaks needs to be dealt with
 **/
 
 object CFG {
-
 	abstract class ControlFlowNode()
 	// Each statement has their own type 
 	case class Merge(label:String, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
@@ -25,10 +23,8 @@ object CFG {
 	case class If(e:AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class DoWhile(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class ForIn(e1 : AST.ASTNode, e2 : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
-	case class Throw(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class With(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class Switch(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
-	case class Catch(i : AST.Identifier, id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	abstract class Case() extends ControlFlowNode()
 	case class CaseClause(e : AST.Expression, id: String = UUID.randomUUID().toString()) extends Case
 	case class DefaultClause(id: String = UUID.randomUUID().toString()) extends Case
@@ -200,8 +196,11 @@ object ControlFlow {
 			statements( List(init, AST.WhileStatement(check, AST.Block( Some(List( s, inc ) )) ) ) )
 		}
 		case AST.ForInStatement(e1,e2,s) => {
-			var cfg = singleCFG(CFG.ForIn(e1,e2)) :: statement(s)
-			makeEdge(cfg,cfg.end,cfg.start, Some("Loop")) > CFG.Merge("ForIn")
+			var check = CFG.ForIn(e1,e2)
+			var merge = CFG.Merge("ForIn")
+			var stmt = statement(s)
+			var cfg = (stmt :: singleCFG(check)) < merge
+			makeEdge(makeEdge(CFG.ControlFlowGraph(cfg.start,merge,cfg.nodes,cfg.edges,cfg.labels),check,merge, Some("False")),stmt.end,check,Some("Loop"))
 		}
 		case AST.LabelledStatement(i,s) => throw NotImplementedException()
 		case AST.SwitchStatement(e,cb) => {
@@ -244,19 +243,21 @@ object ControlFlow {
 			singleCFG(CFG.Throw(e))
 			**/
 		}
-		case AST.WithStatement(e,s) => singleCFG(CFG.With(e)) :: statement(s)
+		case AST.WithStatement(e,s) => statement(s) + CFG.With(e)
 	}
 
 	def statements(ss : List[AST.Statement] ) : CFG.ControlFlowGraph = {
 		ss.foldLeft(emptyCFG)((cfg,add) => statement(add) :: cfg)
 	}
 
+/*
 	def catchBlock(c : AST.Catch, cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
 		c.b.sl match {
 			case None => cfg < CFG.Catch(c.i)
 			case Some(ss) => throw NotImplementedException("Catch block not impl.")
 		}
 	} 
+*/
 
 	def caseBlock(cb : AST.CaseBlock, cfg : CFG.ControlFlowGraph, endNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
 		// TODO Should go through each statment and remove breaks

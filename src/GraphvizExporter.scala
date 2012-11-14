@@ -44,10 +44,8 @@ object GraphvizExporter {
  		case CFG.If(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{If: "+expToString(e)+"}")
  		case CFG.DoWhile(e, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{While: "+expToString(e)+"}")
  		case CFG.ForIn(e1, e2, id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{ForIn: "+expToString(e1)+" in "+expToString(e2)+"}")
- 		case CFG.Throw(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Throw: "+expToString(e)+"}")
  		case CFG.With(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{With: "+expToString(e)+"}")
  		case CFG.Switch(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Switch: "+expToString(e)+"}")
- 		case CFG.Catch(i,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Catch: "+i+"}")
  		case CFG.CaseClause(e,id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Case: "+expToString(e)+"}")
  		case CFG.DefaultClause(id) => "\"%s\" [shape=record label=\"%s\"];".format(id, "{Default Case}")
 	 }
@@ -58,6 +56,10 @@ object GraphvizExporter {
           case '"' => "&quot;"
           case '<' => "&lt;"
           case '>' => "&gt;"
+          case '{' => "\\{"
+          case '}' => "\\}"
+          case ']' => "\\]"
+          case '[' => "\\["
           case other => other toString
         }) mkString;
 	 }
@@ -73,10 +75,8 @@ object GraphvizExporter {
  		case CFG.If(_, id) => id 
  		case CFG.DoWhile(_, id) => id 
  		case CFG.ForIn(_, _, id) => id
- 		case CFG.Throw(_,id) => id 
  		case CFG.With(_,id) => id 
- 		case CFG.Switch(_,id) => id
- 		case CFG.Catch(_,id) => id 
+ 		case CFG.Switch(_,id) => id 
  		case CFG.CaseClause(_,id) => id
  		case CFG.DefaultClause(id) => id
 	 }

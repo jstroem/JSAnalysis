@@ -3,13 +3,13 @@ package JSAnalyzer
 import scala.util.parsing.input.Positional
 
 object AST {  
-	def printOptList(ols : Option[List[Any]], prefix: String = "") = ols match {
-		case Some(ls) => printList(ls,prefix)
+	def printOptList(ols : Option[List[Any]], glue: String = "") = ols match {
+		case Some(ls) => printList(ls,glue)
 		case None => ""
 	}
 
-	def printList(ls : List[Any], prefix: String = "") = ls.headOption match {
-	 	case Some(n) => ls.drop(1).foldLeft(n.toString())((str,n) => n.toString() + str + ", ")
+	def printList(ls : List[Any], glue: String = "") = ls.headOption match {
+	 	case Some(n) => ls.drop(1).foldLeft(n.toString())((str,n) => str + glue + n.toString() )
 	 	case None => ""
 	}
 
@@ -141,7 +141,7 @@ object AST {
 	    n
 	  }
 
-	  override def toString() = obj.toString() + "["+member.toString()+"]"
+	  override def toString() = obj.toString() + "."+member.toString()
 	}
 
 	abstract class Statement() extends SourceElement
@@ -166,7 +166,7 @@ object AST {
 	    n
 	  }
 
-	  override def toString() = value.foldLeft("")((res,x) => res + "["+ x +"]")
+	  override def toString() = "["+ printOptList(value,",") +"]"
 	}
 	case class ObjectLiteral(value: Option[List[KVPair]]) extends Literal {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
@@ -174,7 +174,7 @@ object AST {
 	    value.foreach(graphList(printer, level, n, _, "value"))
 	    n
 	  }
-	  override def toString() = value.foldLeft("")((res,x) => res + "{"+ x +"}")
+	  override def toString() = "{"+ printOptList(value,",") +"}"
 	}
 	case class This() extends Literal {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
@@ -211,7 +211,7 @@ object AST {
 	    val n = printer.addNode("BooleanLiteral", List(("value", value.toString())), level)
 	    n
 	  }
-	  override def toString() = value.toString()
+	  override def toString() = if (value) "true" else "false"
 	}
     case class NullLiteral() extends Literal {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
@@ -256,7 +256,7 @@ object AST {
 	    n
 	  }
 
-	  override def toString() = "var " + printList(vds,",")
+	  override def toString() = "var " + printList(vds,",")+";"
 	}
 	case class EmptyStatement() extends Statement {
 	  override def graphPrint(printer: GraphPrinter, level:Int) = {
@@ -271,7 +271,7 @@ object AST {
 	    graphLink(printer, level, n, e, "expr")
 	    n
 	  }
-	  override def toString() = e.toString()
+	  override def toString() = e.toString() + ";"
 	}
 
 	case class IfStatement(e:Expression,s1: Statement,s2:Option[Statement]) extends Statement {
@@ -325,7 +325,11 @@ object AST {
 	  	var res = "for ("
 	  	res += (e1 match {
 	  		case None => ";"
-	  		case Some(e1) => e1.toString() + ";"
+	  		case Some(e1) => e1 match {
+	  			case e1 : Statement => e1.toString() //No ";" if its a statement
+	  			case e1 : Expression => e1.toString() + ";"
+	  			case _ => e1.toString() + ";"
+	  		}
 	  	})
 	  	res += (e2 match {
 	  		case None => ";"
