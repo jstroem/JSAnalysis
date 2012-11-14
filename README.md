@@ -3,7 +3,7 @@ JSAnalysis
 
 To get graph drawnings you need to install graphviz including dot.
 
-##Run
+#Run
 Use the following command to run:
 
 	scala JSAnalysis
@@ -15,3 +15,16 @@ Use the following command to run:
 An example could be
 	
 	scala JSAnalysis -print-ast -graph-ast ../test/*.js
+
+#TODO
+Todolist in each part
+
+##CFG
+* Check following works:
+	* ForIn
+	* Switch
+
+* Remove Empty nodes
+* functionDeclaration
+* CaseBlocks should be walked though and if a break is caught this should be updated
+* Continue needs to be dealt with
