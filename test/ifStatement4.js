@@ -1,0 +1,1 @@
+var x = 5if (x) { console.log(x) }

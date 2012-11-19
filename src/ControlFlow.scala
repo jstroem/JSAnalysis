@@ -3,9 +3,6 @@ package JSAnalyzer
 import java.util.UUID
 
 /** TODO: 
- 	* Check following works:
-		* Switch
-
 	* Remove Empty nodes
 	* functionDeclaration
 	* CaseBlocks should be walked though and if a break is caught this should be updated
@@ -70,6 +67,24 @@ object ControlFlow {
 			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)))
 			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels)
 		}	
+	}
+
+
+
+	def incomingNodes(cfg : CFG.ControlFlowGraph, node : CFG.ControlFlowNode) : List[CFG.ControlFlowNode] = {
+		cfg.edges.foldLeft(List() : List[CFG.ControlFlowNode])((list,edge) => {
+			var (from,to) = edge;
+			if (to == node) from :: list
+			else list
+		});
+	}
+
+	def outgoingNodes(cfg : CFG.ControlFlowGraph, node : CFG.ControlFlowNode) : List[CFG.ControlFlowNode] = {
+		cfg.edges.foldLeft(List() : List[CFG.ControlFlowNode])((list,edge) => {
+			var (from,to) = edge;
+			if (from == node) to :: list
+			else list
+		});
 	}
 
 	def concat(cfg1 : CFG.ControlFlowGraph, cfg2: CFG.ControlFlowGraph, label: Option[String] = None ) : CFG.ControlFlowGraph = {
@@ -141,6 +156,103 @@ object ControlFlow {
 			)
 		}
 	} 
+
+	def convertBreaks(cfg : CFG.ControlFlowGraph, breakToNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
+		cfg.nodes.foldLeft(cfg)((cfg,node) => {
+			node match  {
+				case CFG.Break(_) => {
+					//Remove old edges from this node
+					var newEdges = cfg.edges.filter((edge) => {
+						var (from,to) = edge
+						from != node
+					})
+					CFG.ControlFlowGraph(cfg.start,cfg.end, cfg.nodes,(node,breakToNode) :: newEdges, cfg.labels)
+				}
+				case _ => cfg
+			}
+		})
+	}
+
+	def removeEmptyNodes(cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
+		var newCfg = cfg.nodes.foldLeft(cfg)((cfg,node) => {
+			node match {
+				case CFG.Empty(_) => {
+					//Remove this empty node
+					var newNodes = cfg.nodes.filter((n) => n != node)
+
+					//Bind new edges
+					var removedEdges = cfg.edges.filter((edge) => {
+						var (from,to) = edge
+						from != node && node != to
+					})
+
+					var appendNewEdges = incomingNodes(cfg,node).foldLeft(removedEdges)((edges,from) => {
+						outgoingNodes(cfg,node).foldLeft(edges)((edges,to) => {
+							 (from,to) :: edges
+						})
+					})
+
+					//Bind new labels
+					var removedLabels = cfg.labels.filter((pair) => {
+						var ((from,to),label) = pair
+						from != node && node != to
+					})
+
+					var appendNewLabels = incomingNodes(cfg,node).foldLeft(removedLabels)((labels,from) => {
+						outgoingNodes(cfg,node).foldLeft(labels)((labels,to) => {
+							(cfg.labels.get(node,to),cfg.labels.get(from,node)) match {
+								case (None,None) => labels
+								case (Some(s),None) => labels + (((from,to), s))
+								case (None,Some(s)) => labels + (((from,to), s))
+								case (Some(s1),Some(s2)) => labels + (((from,to), s1 + s2))
+							}
+						})
+					})
+
+					CFG.ControlFlowGraph(cfg.start,cfg.end,newNodes,appendNewEdges,appendNewLabels)
+				}
+				case _ => cfg
+			}
+		})
+
+		def findNewStart(cfg : CFG.ControlFlowGraph) : CFG.ControlFlowGraph = {
+			cfg.start match {
+				case CFG.Empty(_) => {
+					var edge = cfg.edges.find((edge) => {
+						var (from,to) = edge
+						from == cfg.start
+					})
+					edge match {
+						case None => cfg //Could not finde any nodes that gives a new one
+						case Some((from,to)) => findNewStart(CFG.ControlFlowGraph(to,cfg.end,cfg.nodes,cfg.edges,cfg.labels))
+					}
+				}
+				case _ => cfg
+			}
+		}
+
+		def findNewEnd(cfg : CFG.ControlFlowGraph) : CFG.ControlFlowGraph = {
+			cfg.end match {
+				case CFG.Empty(_) => {
+					var edge = cfg.edges.find((edge) => {
+						var (from,to) = edge
+						to == cfg.end
+					})
+					edge match {
+						case None => cfg //Could not finde any nodes that gives a new one
+						case Some((from,to)) => findNewEnd(CFG.ControlFlowGraph(cfg.start,from,cfg.nodes,cfg.edges,cfg.labels))
+					}
+				}
+				case _ => cfg
+			}
+		}
+
+		var newStart = findNewStart(cfg)
+
+		var newEnd = findNewEnd(cfg)
+
+		CFG.ControlFlowGraph(newStart.start,newEnd.end, newCfg.nodes, newCfg.edges, newCfg.labels)
+	}
 
 	/******************************/
 	/*** Recursivly walkthrough ***/
@@ -259,37 +371,46 @@ object ControlFlow {
 	} 
 */
 
-	def caseBlock(cb : AST.CaseBlock, cfg : CFG.ControlFlowGraph, endNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
+	def caseBlock(cb : AST.CaseBlock, switch : CFG.ControlFlowGraph, endNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
 		// TODO Should go through each statment and remove breaks
-		var (cbs,temps) = cb.ccs.foldLeft((List[(List[CFG.ControlFlowNode],CFG.ControlFlowGraph)](),List[ CFG.ControlFlowNode ]()))((res,cc) => {
-			var (fin,temp) = res
+		var (cfg,ccs,defNode) = cb.ccs.foldLeft((emptyCFG(),List() : List[CFG.ControlFlowNode],false))((res,cc) => {
+			var (cfg,ccs,defNode) = res
 			cc match {
-				case AST.CaseClause(e, sso) => {
+				case AST.CaseClause(e,sso) => {
 					sso match {
-						case Some(ss) => ((CFG.CaseClause(e) :: temp,statements(ss)) :: fin,List())
-						case None => (fin,CFG.CaseClause(e) :: temp)
+						case Some(ss) => {
+							var caseClause = CFG.CaseClause(e)
+							((statements(ss) + caseClause)  :: cfg, caseClause :: ccs,defNode)
+						}
+						case None => {
+							var caseClause = CFG.CaseClause(e)
+							(cfg > caseClause, caseClause :: ccs,defNode)
+						}
 					}
 				}
 				case AST.DefaultClause(sso) => {
 					sso match {
-						case Some(ss) => ((CFG.DefaultClause() :: temp,statements(ss)) :: fin,List())
-						case None => (fin,CFG.DefaultClause() :: temp)
+						case Some(ss) => {
+							var caseClause = CFG.DefaultClause()
+							((statements(ss) + caseClause)  :: cfg, caseClause :: ccs,true)
+						}
+						case None => {
+							var caseClause = CFG.DefaultClause()
+							(cfg > caseClause, caseClause :: ccs,true)
+						}
 					}
 				}
 			}
 		})
-		cbs.foldLeft(cfg)((res,cbs) => {
-			var (cc, statement) = cbs
-			var nCfg = CFG.ControlFlowGraph(
-				res.start,
-				endNode,
-				cfg.nodes ::: statement.nodes, 
-				(statement.end,endNode) :: cfg.edges ::: statement.edges,
-				cfg.labels ++ statement.labels
-			)
-			cc.foldLeft(nCfg)((cfg,c) => {
-				makeEdge(makeEdge((cfg < c),cfg.start,c,None),c,statement.start,None)
-			})
+
+		var cfgBreak = convertBreaks(cfg, endNode)
+
+
+		//Appending the endNode with the begining of the statement in case of no cases match and no default node.
+		var cfgEnd = if (defNode) cfgBreak > endNode else makeEdge(cfgBreak > endNode,switch.end, endNode, None)
+
+		ccs.foldLeft(CFG.ControlFlowGraph(switch.start,cfgEnd.end, switch.nodes ::: cfgEnd.nodes, switch.edges ::: cfgEnd.edges, switch.labels ++ cfgEnd.labels))((cfg,cc) => {
+			makeEdge(cfg,switch.start,cc,None)
 		})
 	}
 
@@ -311,7 +432,7 @@ object ControlFlow {
 	}
 
 	def program( p : AST.Program ) : CFG.ControlFlowGraph = p.a match {
-		case Some(se) => sourceElements(se)
+		case Some(se) => removeEmptyNodes(sourceElements(se))
 		case None => emptyCFG()
 	}
 }
