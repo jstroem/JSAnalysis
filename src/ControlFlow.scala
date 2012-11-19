@@ -33,13 +33,26 @@ object CFG {
 		end: ControlFlowNode, 
 		nodes: List[ControlFlowNode] = List(), 
 		edges: List[(ControlFlowNode, ControlFlowNode)] = List(), 
-		labels:Map[(ControlFlowNode, ControlFlowNode), String] = Map()
+		labels:Map[(ControlFlowNode, ControlFlowNode), String] = Map(),
+		info: Info = Info()
 	) {
 		def +(el: ControlFlowNode ) = ControlFlow.append( this, el )
 		def ::(cfg: ControlFlowGraph ) = ControlFlow.concat( this, cfg )
 		def <(el : ControlFlowNode ) = ControlFlow.addNode(this, el)
 
 		def >(el: ControlFlowNode) = ControlFlow.prepend( this, el )
+	}
+
+	case class Info (
+		handledContinues : List[Continue] = List(),
+		handledBreaks : List[Break] = List()
+	) {
+		def ::(i : Info) = Info( this.handledContinues ::: i.handledContinues, this.handledBreaks ::: i.handledBreaks  )
+		def >(n: ControlFlowNode) = n match {
+			case n : Break => Info( this.handledContinues, n :: this.handledBreaks )
+			case n : Continue => Info( n :: this.handledContinues, this.handledBreaks )
+			case _ => Info( this.handledContinues, this.handledBreaks )
+		}
 	}
 }
 
@@ -52,24 +65,43 @@ object ControlFlow {
 	/******** HELPER METHODS ******/
 	/******************************/
 	def addNode( cfg: CFG.ControlFlowGraph, el: CFG.ControlFlowNode ) : CFG.ControlFlowGraph = {
-		CFG.ControlFlowGraph(cfg.start,cfg.end,el :: cfg.nodes,cfg.edges, cfg.labels)
+		CFG.ControlFlowGraph(cfg.start,cfg.end,el :: cfg.nodes,cfg.edges, cfg.labels,cfg.info)
 	}
 
 	def append( cfg : CFG.ControlFlowGraph, el : CFG.ControlFlowNode,label: Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
-			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++ Map(((el,cfg.start),label)))
-			case None => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels)
+			case Some(label) => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels ++ Map(((el,cfg.start),label)), cfg.info)
+			case None => CFG.ControlFlowGraph(el,cfg.end,el :: cfg.nodes,(el,cfg.start) :: cfg.edges,cfg.labels,cfg.info)
 		}	
 	}
 
 	def prepend( cfg : CFG.ControlFlowGraph, el: CFG.ControlFlowNode, label:Option[String] = None ) : CFG.ControlFlowGraph = {
 		label match {
-			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)))
-			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels)
+			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)), cfg.info)
+			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels, cfg.info)
 		}	
 	}
 
-
+	def concat(cfg1 : CFG.ControlFlowGraph, cfg2: CFG.ControlFlowGraph, label: Option[String] = None ) : CFG.ControlFlowGraph = {
+		label match {
+			case Some(label) => CFG.ControlFlowGraph(
+					cfg1.start,
+					cfg2.end,
+					cfg1.nodes ::: cfg2.nodes, 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, // (cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
+					cfg1.labels ++ cfg2.labels ++ Map(((cfg1.end,cfg2.start),label)),
+					cfg1.info :: cfg2.info
+				)
+			case None => CFG.ControlFlowGraph(
+					cfg1.start,
+					cfg2.end,
+					cfg1.nodes ::: cfg2.nodes, 
+					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, //(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
+					cfg1.labels ++ cfg2.labels,
+					cfg1.info :: cfg2.info
+				)
+		}
+	}
 
 	def incomingNodes(cfg : CFG.ControlFlowGraph, node : CFG.ControlFlowNode) : List[CFG.ControlFlowNode] = {
 		cfg.edges.foldLeft(List() : List[CFG.ControlFlowNode])((list,edge) => {
@@ -85,25 +117,6 @@ object ControlFlow {
 			if (from == node) to :: list
 			else list
 		});
-	}
-
-	def concat(cfg1 : CFG.ControlFlowGraph, cfg2: CFG.ControlFlowGraph, label: Option[String] = None ) : CFG.ControlFlowGraph = {
-		label match {
-			case Some(label) => CFG.ControlFlowGraph(
-					cfg1.start,
-					cfg2.end,
-					cfg1.nodes ::: cfg2.nodes, 
-					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, // (cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
-					cfg1.labels ++ cfg2.labels ++ Map(((cfg1.end,cfg2.start),label))
-				)
-			case None => CFG.ControlFlowGraph(
-					cfg1.start,
-					cfg2.end,
-					cfg1.nodes ::: cfg2.nodes, 
-					(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, //(cfg1.end,cfg2.start) :: cfg1.edges ::: cfg2.edges, 
-					cfg1.labels ++ cfg2.labels
-				)
-		}
 	}
 
 	def emptyCFG() : CFG.ControlFlowGraph = {
@@ -124,14 +137,16 @@ object ControlFlow {
 							mergePoint, 
 							newCfg.nodes ::: added.nodes, 
 							(cfg.end,added.start) :: (added.end,mergePoint) :: newCfg.edges ::: added.edges, 
-							newCfg.labels ++ added.labels ++ Map(((cfg.end,added.start),label))
+							newCfg.labels ++ added.labels ++ Map(((cfg.end,added.start),label)),
+							newCfg.info :: added.info
 						)
 					case None => CFG.ControlFlowGraph(	
 							cfg.start,
 							mergePoint, 
 							newCfg.nodes ::: added.nodes, 
 							(cfg.end,added.start) :: (added.end,mergePoint) :: newCfg.edges ::: added.edges, 
-							newCfg.labels ++ added.labels
+							newCfg.labels ++ added.labels,
+							newCfg.info :: added.info
 						)
 				}
 			}
@@ -145,14 +160,16 @@ object ControlFlow {
 				cfg.end,
 				cfg.nodes,
 				(from,to) :: cfg.edges,
-				cfg.labels ++ Map(((from,to),label))
+				cfg.labels ++ Map(((from,to),label)),
+				cfg.info
 			)
 			case None => CFG.ControlFlowGraph(
 				cfg.start,
 				cfg.end,
 				cfg.nodes,
 				(from,to) :: cfg.edges,
-				cfg.labels
+				cfg.labels,
+				cfg.info
 			)
 		}
 	} 
@@ -161,12 +178,34 @@ object ControlFlow {
 		cfg.nodes.foldLeft(cfg)((cfg,node) => {
 			node match  {
 				case CFG.Break(_) => {
-					//Remove old edges from this node
-					var newEdges = cfg.edges.filter((edge) => {
-						var (from,to) = edge
-						from != node
-					})
-					CFG.ControlFlowGraph(cfg.start,cfg.end, cfg.nodes,(node,breakToNode) :: newEdges, cfg.labels)
+					//Only look at it if its not handled yet
+					if (!cfg.info.handledBreaks.contains(node)){
+						//Remove old edges from this node
+						var newEdges = cfg.edges.filter((edge) => {
+							var (from,to) = edge
+							from != node
+						})
+						CFG.ControlFlowGraph(cfg.start,cfg.end, cfg.nodes,(node,breakToNode) :: newEdges, cfg.labels, cfg.info > node)
+					} else cfg
+				}
+				case _ => cfg
+			}
+		})
+	}
+
+	def convertContinues(cfg : CFG.ControlFlowGraph, continueToNode : CFG.ControlFlowNode) : CFG.ControlFlowGraph = {
+		cfg.nodes.foldLeft(cfg)((cfg,node) => {
+			node match  {
+				case CFG.Continue(_,_) => {
+					//Only look at it if its not handled yet
+					if (!cfg.info.handledContinues.contains(node)){
+						//Remove old edges from this node
+						var newEdges = cfg.edges.filter((edge) => {
+							var (from,to) = edge
+							from != node
+						})
+						CFG.ControlFlowGraph(cfg.start,cfg.end, cfg.nodes,(node,continueToNode) :: newEdges, cfg.labels, cfg.info > node)
+					} else cfg
 				}
 				case _ => cfg
 			}
@@ -209,7 +248,7 @@ object ControlFlow {
 						})
 					})
 
-					CFG.ControlFlowGraph(cfg.start,cfg.end,newNodes,appendNewEdges,appendNewLabels)
+					CFG.ControlFlowGraph(cfg.start,cfg.end,newNodes,appendNewEdges,appendNewLabels,cfg.info)
 				}
 				case _ => cfg
 			}
@@ -224,7 +263,7 @@ object ControlFlow {
 					})
 					edge match {
 						case None => cfg //Could not finde any nodes that gives a new one
-						case Some((from,to)) => findNewStart(CFG.ControlFlowGraph(to,cfg.end,cfg.nodes,cfg.edges,cfg.labels))
+						case Some((from,to)) => findNewStart(CFG.ControlFlowGraph(to,cfg.end,cfg.nodes,cfg.edges,cfg.labels,cfg.info))
 					}
 				}
 				case _ => cfg
@@ -240,7 +279,7 @@ object ControlFlow {
 					})
 					edge match {
 						case None => cfg //Could not finde any nodes that gives a new one
-						case Some((from,to)) => findNewEnd(CFG.ControlFlowGraph(cfg.start,from,cfg.nodes,cfg.edges,cfg.labels))
+						case Some((from,to)) => findNewEnd(CFG.ControlFlowGraph(cfg.start,from,cfg.nodes,cfg.edges,cfg.labels, cfg.info))
 					}
 				}
 				case _ => cfg
@@ -251,7 +290,7 @@ object ControlFlow {
 
 		var newEnd = findNewEnd(cfg)
 
-		CFG.ControlFlowGraph(newStart.start,newEnd.end, newCfg.nodes, newCfg.edges, newCfg.labels)
+		CFG.ControlFlowGraph(newStart.start,newEnd.end, newCfg.nodes, newCfg.edges, newCfg.labels, cfg.info)
 	}
 
 	/******************************/
@@ -284,8 +323,10 @@ object ControlFlow {
 			statement( AST.IfStatement(e, AST.DoWhileStatement(e,s), None ) )
 		}
 		case AST.DoWhileStatement(e,s) => {
-			var cfg = (statement(s) > CFG.DoWhile(e)) + CFG.Merge("While")
-			makeEdge(cfg,cfg.end,cfg.start,Some("Loop"))
+			var endNode = CFG.Merge("End While")
+			var whileNode = CFG.DoWhile(e)
+			var cfg = (statement(s) > whileNode) + CFG.Merge("While") > endNode
+			convertBreaks(convertContinues(makeEdge(cfg,whileNode,cfg.start,Some("Loop")), whileNode),endNode)
 		}
 		case AST.ForStatement(oe1,oe2,oe3,s) => {
 			// Converts this into a while statement 
@@ -312,7 +353,7 @@ object ControlFlow {
 			var merge = CFG.Merge("ForIn")
 			var stmt = statement(s)
 			var cfg = (stmt :: singleCFG(check)) < merge
-			makeEdge(makeEdge(CFG.ControlFlowGraph(cfg.start,merge,cfg.nodes,cfg.edges,cfg.labels),check,merge, Some("False")),stmt.end,check,Some("Loop"))
+			makeEdge(makeEdge(CFG.ControlFlowGraph(cfg.start,merge,cfg.nodes,cfg.edges,cfg.labels,cfg.info),check,merge, Some("False")),stmt.end,check,Some("Loop"))
 		}
 		case AST.LabelledStatement(i,s) => throw NotImplementedException()
 		case AST.SwitchStatement(e,cb) => {
@@ -346,7 +387,10 @@ object ControlFlow {
 				}
 			} **/
 		}
-		case AST.ContinueStatement(oi) => singleCFG(CFG.Continue(oi))
+		case AST.ContinueStatement(oi) => oi match {
+			case Some(i) => throw NotSupportedException("Not supported to make goto-code");
+			case None => singleCFG(CFG.Continue(None))
+		}
 		case AST.BreakStatement(i) => singleCFG(CFG.Break())
 		case AST.ReturnStatement(oe) => singleCFG(CFG.Return(oe))
 		case AST.ThrowStatement(e) => {
@@ -409,7 +453,7 @@ object ControlFlow {
 		//Appending the endNode with the begining of the statement in case of no cases match and no default node.
 		var cfgEnd = if (defNode) cfgBreak > endNode else makeEdge(cfgBreak > endNode,switch.end, endNode, None)
 
-		ccs.foldLeft(CFG.ControlFlowGraph(switch.start,cfgEnd.end, switch.nodes ::: cfgEnd.nodes, switch.edges ::: cfgEnd.edges, switch.labels ++ cfgEnd.labels))((cfg,cc) => {
+		ccs.foldLeft(CFG.ControlFlowGraph(switch.start,cfgEnd.end, switch.nodes ::: cfgEnd.nodes, switch.edges ::: cfgEnd.edges, switch.labels ++ cfgEnd.labels, switch.info :: cfgEnd.info))((cfg,cc) => {
 			makeEdge(cfg,switch.start,cc,None)
 		})
 	}
