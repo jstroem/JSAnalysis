@@ -19,38 +19,4 @@ package JSAnalyzer
 	
 	}
 	
-	class TestLattice(st : Set[Int], botm : Int, tp: Int) extends AbstractLattice[Int](st, botm, tp){
-	  val bottom = botm;
-	  val top = tp;
-	  val set = st;
-	  
-	  def getBottom : Int = {
-	    bottom;
-	  }
-	  
-	  def getTop : Int = {
-	    top;
-	  }
-	   
-	  def compareElement(e1:Int,e2:Int) : Option[Boolean] = {
-	    Some (e1>e2)
-	  }
-	  
-	  def getLub(e1:Int, e2:Int) : Int = {
-	    if(e2>e1){
-	      e2
-	    }else{
-	      e1
-	    }
-	  }
-	  
-	  def getGlb(e1:Int, e2:Int) : Int = {
-	    if(e1>e2){
-	      e1
-	    } else {
-	      e2
-	    }
-	  }
-	  
-	}
 }
