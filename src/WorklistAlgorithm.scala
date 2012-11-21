@@ -1,10 +1,11 @@
 package JSAnalyzer
 
-object WorklistAlgorithm1{
+object WorklistAlgorithm{
 	def worklistalgorithm[t](globalflowfunction : GlobalFlowFunction.GFFunction[t], lattice : Lattice.AbstractLattice[t], cfg : CFG.ControlFlowGraph) : Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t] = {
 	  var worklistStart : List[CFG.ControlFlowNode] = cfg.nodes;
 	  var mapStart = cfg.edges.foldLeft(Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),t]())((map,edge) => map+(edge -> lattice.getBottom))
 	  	  
+		  
 	  def iterateWorklist(info : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t])) : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t]) = {
 		  var (list,map) = info
 		  list.size match {
@@ -19,7 +20,6 @@ object WorklistAlgorithm1{
 				  case None => list
 				})
 				var info_out = globalflowfunction.globalFlowFunction(node, info_in);
-				
 				iterateWorklist(
 				    outgoingEdges.foldLeft((newWorklist,map))((info,edge) => {
 						var (newlist,newmap) = info
@@ -28,7 +28,7 @@ object WorklistAlgorithm1{
 						}else{
 							var newmap2 = newmap+(edge -> lattice.getLub(newmap(edge),info_out))
 							var (from,to) = edge
-							(to::list,newmap2)
+							(to::newlist,newmap2)
 						}
 					}))
 	  }
