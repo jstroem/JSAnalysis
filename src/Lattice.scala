@@ -1,12 +1,8 @@
 package JSAnalyzer
 
 	object Lattice {
-	abstract class AbstractLattice[t](set : Set[t], botm : t, tp : t) {
-	   
-	  def getElements : Set[t]={
-	    return set;
-	  }
-	  
+	abstract class AbstractLattice[t](botm : t, tp : t) {
+	   	  
 	  def getBottom : t
 	  
 	  def getTop : t
