@@ -39,19 +39,35 @@ object CFG {
 		def +(el: ControlFlowNode ) = ControlFlow.append( this, el )
 		def ::(cfg: ControlFlowGraph ) = ControlFlow.concat( this, cfg )
 		def <(el : ControlFlowNode ) = ControlFlow.addNode(this, el)
-
 		def >(el: ControlFlowNode) = ControlFlow.prepend( this, el )
 	}
 
+	case class Function(
+		name: AST.Identifier,
+		params: List[AST.Identifier],
+		start: ControlFlowNode,
+		end: ControlFlowNode,
+		returns: List[Return],
+		cfg: ControlFlowGraph
+	)
+
 	case class Info (
 		handledContinues : List[Continue] = List(),
-		handledBreaks : List[Break] = List()
+		handledBreaks : List[Break] = List(),
+		handledReturns : List[Return] = List(),
+		functions: Map[AST.Identifier, Function] = Map()
 	) {
-		def ::(i : Info) = Info( this.handledContinues ::: i.handledContinues, this.handledBreaks ::: i.handledBreaks  )
-		def >(n: ControlFlowNode) = n match {
-			case n : Break => Info( this.handledContinues, n :: this.handledBreaks )
-			case n : Continue => Info( n :: this.handledContinues, this.handledBreaks )
-			case _ => Info( this.handledContinues, this.handledBreaks )
+		def ::(i : Info) = Info( 
+			this.handledContinues ::: i.handledContinues, 
+			this.handledBreaks ::: i.handledBreaks, 
+			this.handledReturns ::: i.handledReturns, 
+			this.functions ++ i.functions  )
+		def >(n: Any) = n match {
+			case n : Break => Info( this.handledContinues, n :: this.handledBreaks, this.handledReturns, this.functions )
+			case n : Continue => Info( n :: this.handledContinues, this.handledBreaks, this.handledReturns, this.functions )
+			case r : Return => Info( this.handledContinues, this.handledBreaks, r :: this.handledReturns, this.functions )
+			case f : Function => Info( this.handledContinues, this.handledBreaks, this.handledReturns, this.functions + ((f.name,f)) )
+			case _ => Info( this.handledContinues, this.handledBreaks, this.handledReturns, this.functions )
 		}
 	}
 }
@@ -80,6 +96,17 @@ object ControlFlow {
 			case Some(label) => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels ++ Map(((cfg.end,el),label)), cfg.info)
 			case None => CFG.ControlFlowGraph(cfg.start,el,el :: cfg.nodes,(cfg.end,el) :: cfg.edges, cfg.labels, cfg.info)
 		}	
+	}
+
+	def addFunction(cfg: CFG.ControlFlowGraph, func: CFG.Function) : CFG.ControlFlowGraph = {
+		CFG.ControlFlowGraph(
+			cfg.start,
+			cfg.end,
+			cfg.nodes,
+			cfg.edges,
+			cfg.labels,
+			(cfg.info :: func.cfg.info) > func
+		)
 	}
 
 	def concat(cfg1 : CFG.ControlFlowGraph, cfg2: CFG.ControlFlowGraph, label: Option[String] = None ) : CFG.ControlFlowGraph = {
@@ -208,6 +235,20 @@ object ControlFlow {
 					} else cfg
 				}
 				case _ => cfg
+			}
+		})
+	}
+
+	def convertReturns(cfg : CFG.ControlFlowGraph) : (CFG.ControlFlowGraph,List[CFG.Return]) = {
+		cfg.nodes.foldLeft((cfg,List() : List[CFG.Return]))((pair,node) => {
+			var (cfg,list) = pair
+			node match {
+				case node : CFG.Return => {
+					if (!cfg.info.handledReturns.contains(node)) {
+						(CFG.ControlFlowGraph(cfg.start,cfg.end,cfg.nodes,cfg.edges,cfg.labels, cfg.info > node),(node :: list))
+					} else pair
+				}
+				case _ => pair
 			}
 		})
 	}
@@ -460,23 +501,87 @@ object ControlFlow {
 
 	def expression( e:AST.Expression ) : CFG.ControlFlowGraph = singleCFG(CFG.Expression(e))
 
-	def functionDeclaration( fd : AST.FunctionDeclaration ) : CFG.ControlFlowGraph = {
-		emptyCFG() //TODO
+	def functionDeclaration( fd : AST.FunctionDeclaration ) : CFG.Function = {
+		var params = fd.params match {
+			case Some(p) => p
+			case None => List()
+		}
+		var (cfg,returns) = convertReturns( statement(fd.body) )
+		CFG.Function(fd.name, params, cfg.start, cfg.end, returns, cfg)
 	}
 
 	def sourceElements( ses : List[AST.SourceElement] ) : CFG.ControlFlowGraph = {
-		ses.foldLeft(emptyCFG)((cfg,se) => sourceElement(se) :: cfg)
+		ses.foldLeft(emptyCFG)((cfg,se) => sourceElement(se,cfg))
 	}
 	
-	def sourceElement( se : AST.SourceElement ) : CFG.ControlFlowGraph = {
+	def sourceElement( se : AST.SourceElement, cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
 		se match {
-			case se : AST.Statement => statement( se )
-			case se : AST.FunctionDeclaration => functionDeclaration( se )
+			case se : AST.Statement => statement( se ) :: cfg
+			case se : AST.FunctionDeclaration => addFunction(cfg,functionDeclaration( se ))
 		}
 	}
 
 	def program( p : AST.Program ) : CFG.ControlFlowGraph = p.a match {
 		case Some(se) => removeEmptyNodes(sourceElements(se))
 		case None => emptyCFG()
+	}
+}
+
+object CFGGrapher {
+	def nodeToString(n : CFG.ControlFlowNode) : String = n match {
+ 		case CFG.Empty(_) => "Empty"
+ 		case CFG.Break(_) => "Break"
+ 		case CFG.Merge(label,_) => "Merge"
+ 		case CFG.Continue(olabel,_) => "Continue: %s".format(olabel.getOrElse("(no label)"))
+ 		case CFG.Return(oe,_) => "Return: %s".format(oe.getOrElse("(no expression)"))
+ 		case CFG.Expression(e,_) => "Expression: %s".format(e)
+ 		case CFG.Assignment(i,oe,_) => "Assignment "+i+" = %s".format(oe.getOrElse("(no expression)"))
+ 		case CFG.If(e,_) => "If: %s".format(e)
+ 		case CFG.DoWhile(e,_) => "While: %s".format(e)
+ 		case CFG.ForIn(e1, e2,_) => "ForIn %s in %s".format(e1,e2)
+ 		case CFG.With(e,_) => "With: %s".format(e)
+ 		case CFG.Switch(e,_) => "Switch: %s".format(e)
+ 		case CFG.CaseClause(e,_) => "Case: %s".format(e)
+ 		case CFG.DefaultClause(_) => "Default Case"
+ 	}
+
+	 def nodeId( n : CFG.ControlFlowNode ) : String = n match {
+	 	case CFG.Empty(id) => id
+ 		case CFG.Break(id) => id
+ 		case CFG.Merge(_,id) => id 
+ 		case CFG.Continue(_,id) => id 
+ 		case CFG.Return(_,id) => id 
+ 		case CFG.Expression(_, id) => id
+ 		case CFG.Assignment(_,_,id) => id 
+ 		case CFG.If(_, id) => id 
+ 		case CFG.DoWhile(_, id) => id 
+ 		case CFG.ForIn(_, _, id) => id
+ 		case CFG.With(_,id) => id 
+ 		case CFG.Switch(_,id) => id 
+ 		case CFG.CaseClause(_,id) => id
+ 		case CFG.DefaultClause(id) => id
+	 }
+
+	def graph(cfg : CFG.ControlFlowGraph) : GraphvizDrawer.Graph = {
+		new GraphvizDrawer.Graph {
+			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
+			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
+
+			def nodes() = {
+				cfg.nodes.foldLeft(List(start,end))((list,node) => {
+					GraphvizDrawer.Node(nodeId( node ), GraphvizDrawer.escape( nodeToString( node ) ) ) :: list
+				})
+			}
+			def edges() = {
+			 	var edge1 = GraphvizDrawer.Edge("start",nodeId(cfg.start))
+			 	var edge2 = GraphvizDrawer.Edge(nodeId(cfg.end),"end")
+				cfg.edges.foldLeft(List(edge1,edge2))((list,edge) => {
+					var (from,to) = edge
+					GraphvizDrawer.Edge(nodeId(from),nodeId(to), cfg.labels.get((from,to))) :: list
+				})
+			}
+			
+			def name() = "ControlFlowGraph"
+		}
 	}
 }

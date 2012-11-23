@@ -49,13 +49,12 @@ object JSAnalysis {
 	}
 
 	def graphAST(ast : AST.ASTNode, filename : String, dir : String) : Unit = {
-		var printer = new GraphPrinter(ast)
-		printer.print(new PrintStream(dir + filename+".ast.dot"))
+		GraphvizDrawer.export(ASTGrapher.getGraph(ast), new PrintStream(dir + filename+".ast.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".ast.gif " + dir + filename+".ast.dot")
 	}	
 
 	def graphCFG(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-		GraphvizExporter.export(filename,cfg, new PrintStream(dir + filename+".cfg.dot"))
+		GraphvizDrawer.export(CFGGrapher.graph(cfg), new PrintStream(dir + filename+".cfg.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cfg.gif " + dir + filename+".cfg.dot")
 	}
 

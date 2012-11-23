@@ -14,12 +14,12 @@ object AST {
 	}
 
     abstract class ASTNode() extends Positional {
-      def graphPrint(printer: GraphPrinter, level: Int) = printer.addNode()
-      def graphLink(printer: GraphPrinter, level: Int, from: GraphNode, to: ASTNode, label:String) = {
+      def graphPrint(printer: ASTGrapher.Graph, level: Int) = new ASTGrapher.GraphNode("", Nil,1, 0)
+      def graphLink(printer: ASTGrapher.Graph, level: Int, from: ASTGrapher.GraphNode, to: ASTNode, label:String) = {
         val graphTo = to.graphPrint(printer, level+1)
         printer.addLink(from, graphTo, label)
       }
-      def graphList(printer: GraphPrinter, level: Int, from: GraphNode, to: List[ASTNode], label:String) = {
+      def graphList(printer: ASTGrapher.Graph, level: Int, from: ASTGrapher.GraphNode, to: List[ASTNode], label:String) = {
         val graphNodes = to map (x => { x.graphPrint(printer, level+1) })
         printer.addLink(from, printer.makeList(graphNodes), label)
       }
@@ -27,7 +27,7 @@ object AST {
   
 	abstract class Expression() extends ASTNode 
 	case class ExpressionList(lst: List[Expression]) extends Expression {
-		override def graphPrint(printer: GraphPrinter, level:Int) = {
+		override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 			val n = printer.addNode("ExpressionList", Nil, level)
 			graphList(printer, level, n, lst, "lst")
 			n
@@ -38,7 +38,7 @@ object AST {
 
 
 	case class AssignmentExpression(lhs: Expression, op: String, rhs: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("AssignmentExpression", List(("op", op)), level)
 	    graphLink(printer, level, n, lhs, "lhs")
 	    graphLink(printer, level, n, rhs, "rhs")
@@ -49,7 +49,7 @@ object AST {
 	}
 
 	case class FunctionExpression(name: Option[Identifier], params: Option[List[Identifier]], body: Block) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("FunctionExpression", Nil, level)
 	    name.foreach(graphLink(printer, level, n, _, "name"))
 	    params.foreach(graphList(printer, level, n, _, "params"))
@@ -62,7 +62,7 @@ object AST {
 	}
 
 	case class BinaryExpression(op: String, t1: Expression, t2: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("BinaryExpression", List(("op", op)), level)
 	    graphLink(printer, level, n, t1, "t1")
 	    graphLink(printer, level, n, t2, "t2")
@@ -72,7 +72,7 @@ object AST {
 	  override def toString() = t1.toString() +" " + op + " "+ t2.toString()
 	}
 	case class UnaryExpression(op: String, t1: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("UnaryExpression", List(("op", op)), level)
 	    graphLink(printer, level, n, t1, "t1")
 	    n
@@ -81,7 +81,7 @@ object AST {
 	  override def toString() =  op + t1.toString()
 	}
 	case class PostfixExpression(op: String, t1: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("PostfixExpression", List(("op", op)), level)
 	    graphLink(printer, level, n, t1, "t1")
 	    n
@@ -91,7 +91,7 @@ object AST {
 
 	}
 	case class ConditionalExpression(cond: Expression, ifBranch: Expression, elseBranch: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ConditionalExpression", Nil, level)
 	    graphLink(printer, level, n, cond, "condition")
 	    graphLink(printer, level, n, ifBranch, "ifBranch")
@@ -102,7 +102,7 @@ object AST {
 	  override def toString() = "( " + cond.toString() + " ? " + ifBranch.toString() + " : " + elseBranch.toString() + " )"
 	}
 	case class CallExpression(callable: Expression, args: Option[List[Expression]])	extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("CallExpression", Nil, level)
 	    graphLink(printer, level, n, callable, "callable")
 	    args.foreach(graphList(printer, level, n, _, "args"))
@@ -113,7 +113,7 @@ object AST {
 	}
 
 	case class AllocationExpression(exp: Expression) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("AllocationExpression", Nil, level)
 	    graphLink(printer, level, n, exp, "exp")
 	    n
@@ -124,7 +124,7 @@ object AST {
 	
 	abstract class MemberAccessExpression() extends Expression
 	case class ArrayAccessExpression(array: Expression, member: Expression) extends MemberAccessExpression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ArrayAccessExpression", Nil, level)
 	    graphLink(printer, level, n, array, "array")
 	    graphLink(printer, level, n, member, "member")
@@ -134,7 +134,7 @@ object AST {
 	  override def toString() = array.toString() + "["+member.toString()+"]"
 	}
 	case class ObjectAccessExpression(obj: Expression, member: Identifier) extends MemberAccessExpression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ObjectAccessExpression", Nil, level)
 	    graphLink(printer, level, n, obj, "obj")
 	    graphLink(printer, level, n, member, "member")
@@ -146,7 +146,7 @@ object AST {
 
 	abstract class Statement() extends SourceElement
 	case class FunctionDeclaration(name: Identifier, params: Option[List[Identifier]], body: Block) extends SourceElement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("FunctionDeclaration", Nil, level)
 	    graphLink(printer, level, n, name, "name")
 	    graphLink(printer, level, n, body, "body")
@@ -160,7 +160,7 @@ object AST {
 	abstract class Literal() extends Expression
 	
 	case class ArrayLiteral(value: Option[List[Expression]]) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ArrayLiteral", Nil, level)
 	    value.foreach(graphList(printer, level, n, _, "value"))
 	    n
@@ -169,7 +169,7 @@ object AST {
 	  override def toString() = "["+ printOptList(value,",") +"]"
 	}
 	case class ObjectLiteral(value: Option[List[KVPair]]) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ObjectLiteral", Nil, level)
 	    value.foreach(graphList(printer, level, n, _, "value"))
 	    n
@@ -177,7 +177,7 @@ object AST {
 	  override def toString() = "{"+ printOptList(value,",") +"}"
 	}
 	case class This() extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("This", Nil, level)
 	    n
 	  }
@@ -185,7 +185,7 @@ object AST {
 	  override def toString() = "this"
  	}
 	case class DecimalLiteral(value: String) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("DecimalLiteral", List(("value", value)), level)
 	    n
 	  }
@@ -193,28 +193,28 @@ object AST {
 	  override def toString() = value
 	}
     case class HexIntegerLiteral(value: String) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("HexIntegerLiteral", List(("value", value)), level)
 	    n
 	  }
 	  override def toString() = value
 	}
     case class StringLiteral(value: String) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("StringLiteral", List(("value", value.stripPrefix("\"").stripSuffix("\""))), level)
 	    n
 	  }
 	  override def toString() = value
 	}
     case class BooleanLiteral(value: Boolean) extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("BooleanLiteral", List(("value", value.toString())), level)
 	    n
 	  }
 	  override def toString() = if (value) "true" else "false"
 	}
     case class NullLiteral() extends Literal {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("NullLiteral", List(("value", "null")), level)
 	    n
 	  }
@@ -222,7 +222,7 @@ object AST {
 	}
     
     case class Undefined() extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Undefined", List(("value", "undefined")), level)
 	    n
 	  }
@@ -230,7 +230,7 @@ object AST {
 	}
 
 	case class Identifier(value: String) extends Expression {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Identifier", List(("id", value)), level)
 	    n
 	  }
@@ -240,7 +240,7 @@ object AST {
 	
 	//From page 26 at ecma262
 	case class Block(sl : Option[List[Statement]]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Block", Nil, level)
 	    sl.foreach(graphList(printer, level, n, _, "stmts"))
 	    n
@@ -250,7 +250,7 @@ object AST {
 	}
 
 	case class VariableStatement(vds: List[VariableDeclaration]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("VariableStatement", Nil, level)
 	    graphList(printer, level, n, vds, "decls")
 	    n
@@ -259,14 +259,14 @@ object AST {
 	  override def toString() = "var " + printList(vds,",")+";"
 	}
 	case class EmptyStatement() extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("EmptyStatement", Nil, level)
 	    n
 	  }
 	  override def toString() = ";"
 	}
 	case class ExpressionStatement(e:Expression) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ExpressionStatement", Nil, level)
 	    graphLink(printer, level, n, e, "expr")
 	    n
@@ -275,7 +275,7 @@ object AST {
 	}
 
 	case class IfStatement(e:Expression,s1: Statement,s2:Option[Statement]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("IfStatement", Nil, level)
 	    graphLink(printer, level, n, e, "cond")
 	    graphLink(printer, level, n, s1, "ifBranch")
@@ -292,7 +292,7 @@ object AST {
 	  }
 	}
 	case class WhileStatement(e:Expression, s:Statement) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("WhileStatement", Nil, level)
 	    graphLink(printer, level, n, e, "cond")
 	    graphLink(printer, level, n, s, "block")
@@ -302,7 +302,7 @@ object AST {
 	  override def toString() = "while ("+e.toString()+")" + s.toString()
 	}
 	case class DoWhileStatement(e: Expression, s:Statement) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("DoWhileStatement", Nil, level)
 	    graphLink(printer, level, n, e, "cond")
 	    graphLink(printer, level, n, s, "block")
@@ -312,7 +312,7 @@ object AST {
 	  override def toString() = "do " + s.toString() + " while ("+e.toString()+");" 
 	}
 	case class ForStatement(e1:Option[ASTNode],e2:Option[Expression],e3:Option[Expression],s:Statement) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ForStatement", Nil, level)
 	    e1.foreach(graphLink(printer, level, n, _, "init"))
 	    e2.foreach(graphLink(printer, level, n, _, "cond"))
@@ -344,7 +344,7 @@ object AST {
 	}
 
 	case class ForInStatement(e1:ASTNode, e2:Expression, s:Statement) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ForInStatement", Nil, level)
 	    graphLink(printer, level, n, e1, "member")
 	    graphLink(printer, level, n, e2, "iterator")
@@ -355,7 +355,7 @@ object AST {
 	  override def toString() = "for ("+e1.toString()+" in "+e2.toString()+") "+s.toString()
 	}
 	case class ContinueStatement(i:Option[Identifier]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ContinueStatement", Nil, level)
 	    i.foreach(graphLink(printer, level, n, _, "i"))
 	    n
@@ -365,7 +365,7 @@ object AST {
 
 	}
 	case class BreakStatement(i:Option[Identifier]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("BreakStatement", Nil, level)
 	    i.foreach(graphLink(printer, level, n, _, "i"))
 	    n
@@ -374,7 +374,7 @@ object AST {
 	  override def toString() = "break;"
 	}
 	case class ReturnStatement(e: Option[Expression]) extends Statement  {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ReturnStatement", Nil, level)
 	    e.foreach(graphLink(printer, level, n, _, "value"))
 	    n
@@ -386,7 +386,7 @@ object AST {
 	  }
 	}
 	case class WithStatement(e:Expression, s: Statement) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("WithStatement", Nil, level)
 	    graphLink(printer, level, n, e, "expr")
 	    graphLink(printer, level, n, s, "block")
@@ -396,7 +396,7 @@ object AST {
 	  override def toString() = "with("+e.toString()+") " + s.toString()
 	}
 	case class LabelledStatement(i:Identifier, s: Statement) extends Statement	 {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("LabelledStatement", Nil, level)
 	    graphLink(printer, level, n, i, "id")
 	    graphLink(printer, level, n, s, "block")
@@ -406,7 +406,7 @@ object AST {
 	  override def toString() = i.toString() + ": "+ s.toString()
 	}
 	case class SwitchStatement(e:Expression,cb:CaseBlock) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("SwitchStatement", Nil, level)
 	    graphLink(printer, level, n, e, "expr")
 	    graphLink(printer, level, n, cb, "caseBlock")
@@ -416,7 +416,7 @@ object AST {
 	  override def toString() = "switch ("+e.toString()+") " + cb.toString()
 	}
 	case class ThrowStatement(e:Expression) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ThrowStatement", Nil, level)
 	    graphLink(printer, level, n, e, "e")
 	    n
@@ -425,7 +425,7 @@ object AST {
 	  override def toString() = "throw " + e.toString() + ";"
 	}
 	case class TryStatement(b:Block,c:Option[Catch], f:Option[Block]) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("TryStatement", Nil, level)
 	    graphLink(printer, level, n, b, "tryBlock")
 	    c.foreach(graphLink(printer, level, n, _, "catchBlock"))
@@ -441,7 +441,7 @@ object AST {
 	  }
 	}
 	case class DebuggerStatement() extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("DebuggerStatement", Nil, level)
 	    n
 	  }
@@ -449,7 +449,7 @@ object AST {
 	  override def toString() = "debugger;"
 	}
 	case class ImportStatement(names: List[String], wildcard: Boolean) extends Statement {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("ImportStatement", List(("name", names mkString "."), ("wildcard", wildcard.toString())), level)
 	    n
 	  }
@@ -459,7 +459,7 @@ object AST {
 
 	//Helper classes for statements
 	case class VariableDeclaration(i:Identifier,a:Option[Expression]) extends ASTNode {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("VariableDeclaration", Nil, level)
 	    graphLink(printer, level, n, i, "name")
 	    a.foreach(graphLink(printer, level, n, _, "value"))
@@ -472,7 +472,7 @@ object AST {
 	  })
 	}
 	case class CaseBlock(ccs:List[Case]) extends ASTNode {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("CaseBlock", Nil, level)
 	    graphList(printer, level, n, ccs, "cases")
 	    n
@@ -484,7 +484,7 @@ object AST {
 	abstract class Case() extends ASTNode 
 
 	case class CaseClause(e:Expression,ss: Option[List[Statement]]) extends Case {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("CaseClause", Nil, level)
 	    graphLink(printer, level, n, e, "expr")
 	    ss.foreach(graphList(printer, level, n, _, "stmts"))
@@ -495,7 +495,7 @@ object AST {
 	}
 
 	case class DefaultClause(ss: Option[List[Statement]]) extends Case {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("DefaultClause", Nil, level)
 	    ss.foreach(graphList(printer, level, n, _, "stmts"))
 	    n
@@ -505,7 +505,7 @@ object AST {
 	}
 
 	case class Catch(i:Identifier,b:Block) extends ASTNode {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Catch", Nil, level)
 	    graphLink(printer, level, n, i, "id")
 	    graphLink(printer, level, n, b, "block")
@@ -516,7 +516,7 @@ object AST {
 	}
 	
 	case class KVPair(key: ASTNode, value:ASTNode) extends ASTNode {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = key.graphPrint(printer, level)
 	    graphLink(printer, level, n, value, "value")
 	    n
@@ -529,7 +529,7 @@ object AST {
 	abstract class SourceElement() extends ASTNode
 
 	case class Program(a:Option[List[SourceElement]]) extends ASTNode {
-	  override def graphPrint(printer: GraphPrinter, level:Int) = {
+	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Program", Nil, level)
 	    a.foreach(graphList(printer, level, n, _, "elems"))
 	    n
@@ -539,5 +539,88 @@ object AST {
 	  	case Some(se) => se.foldLeft("")((s,res) => s.toString() + res)
 	  	case None => ""
 	  }
+	}
+}
+
+object ASTGrapher {
+
+
+	class GraphLink(val from: GraphNode, val to: GraphNode, val label: String)
+	class GraphNode(val name: String, val attributes: List[(String, String)], val id: Int, val level: Int) {
+		def idString() = "n%d".format(id)
+		def labelString() = {
+			var res = ""
+			if (attributes.length > 0) {
+				res = "{%s".format(name)
+				for ((attr, value) <- attributes) {
+					res += "|{%s|%s}".format(attr, GraphvizDrawer.escape(value).stripPrefix("\"").stripSuffix("\""))
+				}
+				res += "}"
+			} else {
+				res = name
+			}
+			res
+		}
+	}
+
+	class Graph() extends GraphvizDrawer.Graph {
+		var nodeList: List[GraphNode] = List()
+		var edgeList: List[GraphLink] = List()
+		var counter = 0
+
+		override def name() = "ASTGraph"
+
+		override def nodes() : List[GraphvizDrawer.Node] = this.nodeList.foldLeft(List() : List[GraphvizDrawer.Node])((list,node) => {
+				GraphvizDrawer.Node(node.idString(),node.labelString(),None,Some(node.level)) :: list
+			})
+
+		override def edges() : List[GraphvizDrawer.Edge] = this.edgeList.foldLeft(List() : List[GraphvizDrawer.Edge])((list,edge) => {
+				GraphvizDrawer.Edge(edge.from.idString(), edge.to.idString(), Some(edge.label)) :: list
+			})
+
+		def addNode(name: String, attributes: List[(String, String)], level: Int) = {
+			val node = new GraphNode(name, attributes, counter, level)
+			nodeList = node :: nodeList
+			counter += 1
+			node
+		}
+
+
+		/*
+		* Create a link from @from to @to with label @label
+		*/
+		def addLink(from: GraphNode, to: GraphNode, label: String) = {
+			val link = new GraphLink(from, to, label)
+			edgeList = link :: edgeList
+		}
+
+	  /*
+	   * Given a list of graph nodes, create the necessary links between them
+	   * and return the first node
+	   */
+		def makeList(lst: List[GraphNode]) = {
+			var prevNode: Option[GraphNode] = None
+			var firstNode: Option[GraphNode] = None
+
+			for (node <- lst) {
+				firstNode match {
+					case None => { firstNode = Some(node) }
+					case Some(x) => {} // nop
+				}
+				prevNode match {
+					case None => { prevNode = Some(node) }
+					case Some(prev) => { addLink(prev, node, ""); prevNode = Some(node) }
+				}
+			}
+
+			firstNode.get
+		}
+	}
+
+	
+	def getGraph(start: AST.ASTNode) : GraphvizDrawer.Graph = {
+		var graph = new Graph()
+		start.graphPrint(graph,0)
+		graph
 	}
 }
