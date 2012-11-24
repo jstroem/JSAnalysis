@@ -501,13 +501,13 @@ object ControlFlow {
 
 	def expression( e:AST.Expression ) : CFG.ControlFlowGraph = singleCFG(CFG.Expression(e))
 
-	def functionDeclaration( fd : AST.FunctionDeclaration ) : CFG.Function = {
+	def functionDeclaration( fd : AST.FunctionExpression ) : CFG.Function = {
 		var params = fd.params match {
 			case Some(p) => p
 			case None => List()
 		}
 		var (cfg,returns) = convertReturns( statement(fd.body) )
-		CFG.Function(fd.name, params, cfg.start, cfg.end, returns, cfg)
+		CFG.Function(fd.name.getOrElse(AST.Identifier("unnamed")), params, cfg.start, cfg.end, returns, cfg)
 	}
 
 	def sourceElements( ses : List[AST.SourceElement] ) : CFG.ControlFlowGraph = {
@@ -516,8 +516,9 @@ object ControlFlow {
 	
 	def sourceElement( se : AST.SourceElement, cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
 		se match {
+			case AST.ExpressionStatement( fe: AST.FunctionExpression ) => addFunction(cfg, functionDeclaration ( fe ))
 			case se : AST.Statement => statement( se ) :: cfg
-			case se : AST.FunctionDeclaration => addFunction(cfg,functionDeclaration( se ))
+			case se : AST.FunctionExpression => addFunction(cfg,functionDeclaration( se ))
 		}
 	}
 

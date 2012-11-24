@@ -79,7 +79,12 @@ object JSParser extends RegexParsers {
   lazy val CaseClauses = rep1(CaseClause)
                   ;
 
-  lazy val StatementList:Parser[List[AST.Statement]] = rep1(Statement)
+  lazy val StatementList:Parser[List[AST.Statement]] = rep1(Statement) ^^ { _.map(x => {
+    x match {
+      case AST.ExpressionStatement(AST.ExpressionList(el)) => el.map(AST.ExpressionStatement(_))
+      case _ => List(x)
+    }
+  }).reduceLeft((a ,b) => a ::: b) }
                     ;
 
   lazy val BitwiseORExpressionNoIn = positioned(BitwiseXORExpressionNoIn * (BitwiseOROperator ^^ makeBinaryOp)
@@ -168,7 +173,12 @@ object JSParser extends RegexParsers {
                              ConditionalExpression  
                            );
 
-  lazy val SourceElements: Parser[List[AST.SourceElement]] = rep1(SourceElement)
+  lazy val SourceElements: Parser[List[AST.SourceElement]] = rep1(SourceElement) ^^ { _.map(x => {
+    x match {
+      case AST.ExpressionStatement(AST.ExpressionList(el)) => el.map(AST.ExpressionStatement(_))
+      case _ => List(x)
+    }
+  }).reduceLeft((a ,b) => a ::: b) }
                      ;
 
   lazy val EqualityOperator = "==" |
@@ -294,7 +304,7 @@ object JSParser extends RegexParsers {
   lazy val BitwiseORExpression = positioned(BitwiseXORExpression * (BitwiseOROperator ^^ makeBinaryOp)
                           );
 
-  lazy val Expression = positioned(rep1sep(AssignmentExpression, ",") ^^ { AST.ExpressionList(_) }
+  lazy val Expression = positioned(rep1sep(AssignmentExpression, ",") ^^ { makeExpressionList(_) }
                  );
 
   lazy val AdditiveExpression = positioned(MultiplicativeExpression * (AdditiveOperator ^^ makeBinaryOp)
@@ -313,7 +323,7 @@ object JSParser extends RegexParsers {
                              );
 
   lazy val FunctionDeclaration = positioned("function" ~> Identifier ~ ("(" ~> opt(FormalParameterList) <~ ")") ~ FunctionBody ^^ { 
-                              case name ~ params ~ body => { AST.FunctionDeclaration(name, params, body) }
+                              case name ~ params ~ body => { AST.FunctionExpression(Some(name), params, body) }
                             }
                           );
 
@@ -357,7 +367,7 @@ object JSParser extends RegexParsers {
   lazy val ObjectLiteral = positioned("{" ~> opt(PropertyNameAndValueList) <~ "}" ^^ { AST.ObjectLiteral(_) }
                     );
 
-  lazy val ExpressionNoIn = rep1sep(AssignmentExpressionNoIn, ",") ^^ { AST.ExpressionList(_) }
+  lazy val ExpressionNoIn = rep1sep(AssignmentExpressionNoIn, ",") ^^ { makeExpressionList(_) }
                      ;
 
   lazy val LeftHandSideExpressionForIn = positioned(CallExpressionForIn |
@@ -452,6 +462,14 @@ object JSParser extends RegexParsers {
   
   def makeBinaryOp(op: String) =
     (fact1: AST.Expression, fact2: AST.Expression) => AST.BinaryExpression(op, fact1, fact2)
+  
+  def makeExpressionList(el: List[AST.Expression]) = {
+    if (el.length > 1) {
+      AST.ExpressionList(el)
+    } else {
+      el(0)
+    }
+  }
     
   /* APPLY */
   def apply(input: String): AST.Program = parseAll(Program, input) match {
