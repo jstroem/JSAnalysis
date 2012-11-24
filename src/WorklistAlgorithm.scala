@@ -11,7 +11,7 @@ object WorklistAlgorithm{
 		  list.size match {
 		  	case 0 => (list,map)
 		  	case _ => 
-				var node : CFG.ControlFlowNode = list.first;
+				var node : CFG.ControlFlowNode = list.head;
 				var newWorklist : List[CFG.ControlFlowNode] = list.slice(1,list.size);
 				var incomingEdges : List[(CFG.ControlFlowNode, CFG.ControlFlowNode)] = cfg.edges.filter{case(from,to) => to==node};
 				var outgoingEdges : List[(CFG.ControlFlowNode, CFG.ControlFlowNode)] = cfg.edges.filter{case(from,to) => from==node};
