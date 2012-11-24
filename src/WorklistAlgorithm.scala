@@ -23,14 +23,12 @@ object WorklistAlgorithm{
 				iterateWorklist(
 				    outgoingEdges.foldLeft((newWorklist,map))((info,edge) => {
 						var (newlist,newmap) = info
-						if(lattice.getLub(newmap(edge),info_out) == newmap(edge)){
-							(newlist,newmap)
-						}else{
-							var newmap2 = newmap+(edge -> lattice.getLub(newmap(edge),info_out))
-							var (from,to) = edge
-							(to::newlist,newmap2)
-						}
-					}))
+						(lattice.compareElements(lattice.getLub(newmap(edge),info_out), newmap(edge)),lattice.compareElements(newmap(edge), lattice.getLub(newmap(edge),info_out))) match {
+							case (Some (true), Some (true)) => (newlist,newmap)
+							case (_,_) => var newmap2 = newmap+(edge -> lattice.getLub(newmap(edge),info_out))
+										  var (from,to) = edge
+										 (to::newlist,newmap2)
+					}}))
 	  }
 	}
 	var (_,newMap) = iterateWorklist((worklistStart,mapStart))	
