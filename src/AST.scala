@@ -58,7 +58,7 @@ object AST {
 	  }
 
 	  override def toString() = {
-	  	"function " + name.foreach((x) => x.toString()) + "("+ printOptList(params,",")+")" + body.toString()
+	  	"function " + name.getOrElse("") + "("+ printOptList(params,",")+")" + body.toString()
 	  }
 	}
 

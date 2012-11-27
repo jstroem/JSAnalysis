@@ -2,16 +2,16 @@ package JSAnalyzer
 
 object GraphvizDrawer {
 	var tab = "\t"
-	def export(graph: Graph ,export:  java.io.PrintStream = System.out) = {
+	def export(graph: Graph ,export:  java.io.PrintStream = System.out, clusters : Int = 0) = {
  		export.println("digraph "+graph.name()+" {")
 
- 		drawGraph( graph, export )
+ 		drawGraph( graph, export,clusters )
 
  		export.println("}")
 	}
 
-	def drawGraph( graph : Graph, export:  java.io.PrintStream = System.out) : Unit = {
-		drawSubgraphs( graph.subgraphs(), export )
+	def drawGraph( graph : Graph, export:  java.io.PrintStream = System.out,clusters : Int = 0) : Int = {
+		var newCluster = drawSubgraphs( graph.subgraphs(), export, clusters )
 
 		drawNodes( graph.nodes(), export )
 
@@ -20,14 +20,17 @@ object GraphvizDrawer {
  		drawEdges( graph.edges(), export )
 
  		drawRanks( ranks, export )
+
+ 		newCluster
 	}
 
-	def drawSubgraphs( graphs: List[Graph], export:  java.io.PrintStream = System.out ) = {
-		graphs.foreach((graph) => {
-			export.println("subgraph "+graph.name()+" {")
-			export.println("label \""+graph.name()+"\";")
-			drawGraph( graph, export )
+	def drawSubgraphs( graphs: List[Graph], export:  java.io.PrintStream = System.out,clusters : Int = 0 ) : Int = {
+		graphs.foldLeft(clusters)((clusters,graph) => {
+			export.println("subgraph cluster_"+clusters+" {")
+			export.println("label = \""+graph.name()+"\";")
+			var res = drawGraph( graph, export, clusters + 1 )
 			export.println("}")
+			res
 		})
 	}
 
