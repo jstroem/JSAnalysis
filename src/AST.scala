@@ -581,6 +581,8 @@ object ASTGrapher {
 				GraphvizDrawer.Edge(edge.from.idString(), edge.to.idString(), Some(edge.label)) :: list
 			})
 
+		override def subgraphs() : List[GraphvizDrawer.Graph] = List()
+
 		def addNode(name: String, attributes: List[(String, String)], level: Int) = {
 			val node = new GraphNode(name, attributes, counter, level)
 			nodeList = node :: nodeList

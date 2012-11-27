@@ -54,7 +54,7 @@ object JSAnalysis {
 	}	
 
 	def graphCFG(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-		GraphvizDrawer.export(CFGGrapher.graph(cfg), new PrintStream(dir + filename+".cfg.dot"))
+		GraphvizDrawer.export(CFGGrapher.graph("ControlFlowGraph",cfg), new PrintStream(dir + filename+".cfg.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cfg.gif " + dir + filename+".cfg.dot")
 	}
 

@@ -98,6 +98,26 @@ object ControlFlow {
 		}	
 	}
 
+	def reverse( cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
+		var newEdges = cfg.edges.foldLeft(List() : List[(CFG.ControlFlowNode,CFG.ControlFlowNode)])((list,edge) => {
+			var (from,to) = edge
+			(to,from) :: list
+		})
+		var newLabels = cfg.labels.foldLeft(Map() : Map[(CFG.ControlFlowNode,CFG.ControlFlowNode),String])((map,pair) => {
+			var ((from,to),label) = pair
+			map + (((to,from),label))
+		})
+		var newInfo = cfg.info.functions.foldLeft(Map() : Map[AST.Identifier, CFG.Function])((map,pair) => {
+			var (name,func) = pair
+			map + ((name,reverseFunction(func)))
+		})
+		CFG.ControlFlowGraph(cfg.end, cfg.start, cfg.nodes, newEdges, newLabels, cfg.info)
+	}
+
+	def reverseFunction( func : CFG.Function ) : CFG.Function = {
+		CFG.Function(func.name, func.params, func.start, func.end, func.returns, reverse(func.cfg))
+	}
+
 	def addFunction(cfg: CFG.ControlFlowGraph, func: CFG.Function) : CFG.ControlFlowGraph = {
 		CFG.ControlFlowGraph(
 			cfg.start,
@@ -563,7 +583,7 @@ object CFGGrapher {
  		case CFG.DefaultClause(id) => id
 	 }
 
-	def graph(cfg : CFG.ControlFlowGraph) : GraphvizDrawer.Graph = {
+	def graph(n : String, cfg : CFG.ControlFlowGraph) : GraphvizDrawer.Graph = {
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
@@ -581,8 +601,15 @@ object CFGGrapher {
 					GraphvizDrawer.Edge(nodeId(from),nodeId(to), cfg.labels.get((from,to))) :: list
 				})
 			}
+
+			def subgraphs() = {
+				cfg.info.functions.foldLeft(List() : List[GraphvizDrawer.Graph])((list,pair) => {
+					var (name,func) = pair
+					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg) :: list
+				})
+			}
 			
-			def name() = "ControlFlowGraph"
+			def name() = n
 		}
 	}
 }
