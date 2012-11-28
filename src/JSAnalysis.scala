@@ -2,8 +2,8 @@ import JSAnalyzer._
 import java.io._
 
 object JSAnalysis {
-	case class RuntimeOpts(printAst: Boolean = false, graphAst: Boolean = false, graphCfg: Boolean = false, files: List[String] = List()) {
-		override def toString() = "" + (if (printAst) "printAst " else "") + (if (graphAst) "graphAst " else "") + (if (graphCfg) "graphCfg " else "")
+	case class RuntimeOpts(printAst: Boolean = false, graphAst: Boolean = false, graphCfg: Boolean = false, graphCSE: Boolean = false, files: List[String] = List()) {
+		override def toString() = "" + (if (printAst) "printAst " else "") + (if (graphAst) "graphAst " else "") + (if (graphCfg) "graphCfg " else "") + (if (graphCSE) "graphCSE " else "") 
 	}
 
 	def analyzeDir(dir : File, opts : RuntimeOpts = RuntimeOpts()) : Unit = {
@@ -32,9 +32,13 @@ object JSAnalysis {
 		var ast = makeAst(file)
 		if (opts.printAst) printAST(ast, new PrintStream(dir + filename + ".ast"))
 		if (opts.graphAst) graphAST(ast, filename, dir)
-
-		var cfg = ControlFlow.program( ast )
+   	    
+		var emptyNode = new CFG.Empty()
+	    var cfg = ControlFlow.program( ast )
 		if (opts.graphCfg) graphCFG(cfg, filename, dir)
+
+		if (opts.graphCSE) graphCSE(cfg, filename, dir);
+
 	}
 
 	def makeAst(file: File) : AST.Program = {
@@ -58,12 +62,21 @@ object JSAnalysis {
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cfg.gif " + dir + filename+".cfg.dot")
 	}
 
+	def graphCSE(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
+		var lattice = new Lattice.CSELattice(CSE.getCSELatticeBottom(cfg),CSE.getCSELatticeTop(cfg))
+		var gff = new GlobalFlowFunction.CSEFlowFunction;
+		var cse = WorklistAlgorithm.worklistalgorithm(gff,lattice,cfg);	
+		GraphvizDrawer.export(CSEGrapher.graph(cfg, cse), new PrintStream(dir + filename+".cse.dot"))
+		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
+	}
+	
 	def main(args : Array[String]) = {
 		val opts = args.foldLeft(RuntimeOpts())((opts,arg) => arg match {
-			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.files)
-			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.files)
-			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.files)
-			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, arg :: opts.files)
+			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.files)
+			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.files)
+			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.graphCSE, opts.files)
+			case "-graph-cse" => RuntimeOpts(opts.printAst, true, opts.graphCfg, true, opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, arg :: opts.files)
 		})
 		println("Running analysis with options: "+ opts.toString())
 
