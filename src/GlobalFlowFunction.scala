@@ -22,7 +22,7 @@ object GlobalFlowFunction{
 																																	map.foldLeft(map){case (map1,(key,explist)) => 
 																																								map1+(key -> explist.filter(exp => !isIdentifierInExpression(exp,iden)))})}	
 																case _	=> infoMap} //The "_" case should not be used
-				case AST.BinaryExpression (op,e1,e2) => println("op " + op + " e1 " + e1 + " e2 " + e2);expressionType(e2, expressionType (e1,infoMap, identifiers), identifiers)
+				case AST.BinaryExpression (op,e1,e2) => expressionType(e2, expressionType (e1,infoMap, identifiers), identifiers)
 				case AST.UnaryExpression (op, e) => expressionType(e,infoMap, identifiers)							
 				case AST.PostfixExpression (op,e) => expressionType(e,infoMap, identifiers)					
 				case AST.ConditionalExpression (e1,e2,e3) => expressionType(e3,expressionType(e2, expressionType (e1,infoMap, identifiers), identifiers), identifiers)

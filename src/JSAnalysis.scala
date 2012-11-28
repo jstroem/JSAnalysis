@@ -81,7 +81,7 @@ object JSAnalysis {
 		var lattice = new Lattice.CSELattice(CSE.getCSELatticeBottom(cfg),CSE.getCSELatticeTop(cfg))
 		var gff = new GlobalFlowFunction.CSEFlowFunction;
 		var cse = WorklistAlgorithm.worklistalgorithm(gff,lattice,cfg);	
-		GraphvizDrawer.export(CSEGrapher.graph(cfg, cse), new PrintStream(dir + filename+".cse.dot"))
+		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
 	}
 
