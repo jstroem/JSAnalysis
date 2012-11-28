@@ -1,15 +1,30 @@
 package JSAnalyzer
 
-object WorklistAlgorithm{
-	def worklistalgorithm[t](globalflowfunction : GlobalFlowFunction.GFFunction[t], lattice : Lattice.AbstractLattice[t], cfg : CFG.ControlFlowGraph) : Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t] = {
-	  var worklistStart : List[CFG.ControlFlowNode] = cfg.nodes;
-	  var mapStart = cfg.edges.foldLeft(Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),t]())((map,edge) => map+(edge -> lattice.getBottom))
+object DataFlowAnalysis{
+	abstract class DataFlowAnalysis[t] {
+	
+		def globalFlowFunction(node:CFG.ControlFlowNode, info_in : List[t], lattice : DataFlowAnalysis[t]) : t
+		
+		def getBottom : t
 	  
-	  def iterateWorklist(info : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t])) : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t]) = {
+		def getTop : t
+	   
+		def compareElements(e1:t,e2:t) : Option[Boolean]
+	  
+		def getLub(e1:t, e2:t) : t
+	  
+		def getGlb(e1:t, e2:t) : t
+	}
+	
+	def worklistalgorithm[t](globalflowfunction : DataFlowAnalysis[t], lattice : DataFlowAnalysis[t], cfg : CFG.ControlFlowGraph) : Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t] = {
+		var worklistStart : List[CFG.ControlFlowNode] = cfg.nodes;
+		var mapStart = cfg.edges.foldLeft(Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),t]())((map,edge) => map+(edge -> lattice.getBottom))
+
+		def iterateWorklist(info : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t])) : (List[CFG.ControlFlowNode], Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), t]) = {
 		  var (list,map) = info
 		  list.size match {
-		  	case 0 => (list,map)
-		  	case _ => 
+			case 0 => (list,map)
+			case _ => 
 				var node : CFG.ControlFlowNode = list.head;
 				var newWorklist : List[CFG.ControlFlowNode] = list.slice(1,list.size);
 				var incomingEdges : List[(CFG.ControlFlowNode, CFG.ControlFlowNode)] = cfg.edges.filter{case(from,to) => to==node};
@@ -21,7 +36,7 @@ object WorklistAlgorithm{
 
 				var info_out = globalflowfunction.globalFlowFunction(node, info_in, lattice);
 				iterateWorklist(
-				    outgoingEdges.foldLeft((newWorklist,map))((info,edge) => {
+					outgoingEdges.foldLeft((newWorklist,map))((info,edge) => {
 						var (newlist,newmap) = info
 						(lattice.compareElements(lattice.getLub(newmap(edge),info_out), newmap(edge)),lattice.compareElements(newmap(edge), lattice.getLub(newmap(edge),info_out))) match {
 							case (Some (true), Some (true)) => (newlist,newmap)
@@ -29,13 +44,10 @@ object WorklistAlgorithm{
 										  var (from,to) = edge
 										 (to::newlist,newmap2)
 					}}))
-	  }
-	}
-	var (_,newMap) = iterateWorklist((worklistStart,mapStart))	
-	newMap
-	}	
+		}
+		}
+			var (_,newMap) = iterateWorklist((worklistStart,mapStart))	
+			newMap
+		}	
+
 }
-
-
-
-

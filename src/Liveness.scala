@@ -3,7 +3,7 @@ package JSAnalyzer
 
 object Liveness {
 	
-	class LivenessAnalysis(variables: List[AST.Identifier]) extends Lattice.AbstractLattice[List[AST.Identifier]], GlobalFlowFunction.GFFunction[List[AST.Identifier]] {
+	class LivenessAnalysis(variables: List[AST.Identifier]) extends DataFlowAnalysis.DataFlowAnalysis[List[AST.Identifier]] {
 			  
 	  def getBottom : List[AST.Identifier] = List()
 	  
@@ -11,7 +11,7 @@ object Liveness {
 	   
 	  def compareElements(m1:List[AST.Identifier],m2:List[AST.Identifier]) : Option[Boolean] = {
 	  	var shared = m1.intersect(m2)
-	  	if (shared.size == 0) None()
+	  	if (shared.size == 0) None
 	  	else if (shared == m1) Some(true)
 	  	else Some(false)
 	  }
@@ -24,7 +24,7 @@ object Liveness {
 		m1.intersect(m2)
 	  }
 
-	  def globalFlowFunction(node:CFG.ControlFlowNode, info_out : List[AST.Identifier], lattice : Lattice.AbstractLattice[List[AST.Identifier]])= node match {
+	  def globalFlowFunction(node:CFG.ControlFlowNode, info_out : List[AST.Identifier], lattice : DataFlowAnalysis.DataFlowAnalysis[List[AST.Identifier]])= node match {
 	//		case CFG.Merge(_,_) => lattice.getGlb(info_in(0),info_in(1)) //TODO
 			case CFG.Continue(oi,_) => info_out
 			case CFG.Return(e,_) => expression(e,info_out)
@@ -70,11 +70,11 @@ object Liveness {
 		case AST.ConditionalExpression(cond, ifBranch, elseBranch) => expression(elseBranch,expression(ifBranch,expression(cond,info_out)))
 		case AST.CallExpression(callable, args) => args.getOrElse(List()).foldLeft(expression(callable,info_out))((list,exp) => expression(exp,list))
 		case AST.AllocationExpression(exp) => expression(exp,info_out)
-		case MemberAccessExpression() => info_out
-		case ObjectAccessExpression(obj, member) => expression(obj,info_out)
-		case Undefined() => info_out
-		case Literal() => info_out
-		case Identifier(v) => e :: info_out
+		case AST.MemberAccessExpression() => info_out
+		case AST.ObjectAccessExpression(obj, member) => expression(obj,info_out)
+		case AST.Undefined() => info_out
+		case AST.Literal() => info_out
+		case AST.Identifier(v) => e :: info_out
 	}
 
 	def variables(cfg : CFG.ControlFlowGraph) : List[AST.Identifier] = {
@@ -84,7 +84,7 @@ object Liveness {
 		})
 	}
 
-	def graph(cfg : CFG.ControlFlowGraph, liveness: Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifer]],startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
+	def graph(cfg : CFG.ControlFlowGraph, liveness: Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]],startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
 		var n = "ControlFlowGraph"
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))

@@ -1,12 +1,46 @@
 package JSAnalyzer
 
-object GlobalFlowFunction{
-	abstract class GFFunction[t] {
-		def globalFlowFunction(node:CFG.ControlFlowNode, info_in : List[t], lattice : Lattice.AbstractLattice[t]) : t;
+object CSEFlowAnalysis{
+
+	class CSELattice(bottom : Map[AST.Identifier, List[AST.Expression]], top: Map[AST.Identifier, List[AST.Expression]]) extends DataFlowAnalysis.DataFlowAnalysis[Map[AST.Identifier, List[AST.Expression]]] {
+			  
+	def getBottom : Map[AST.Identifier, List[AST.Expression]] = {
+		bottom;
 	}
-	
-	class CSEFlowFunction extends GlobalFlowFunction.GFFunction[Map[AST.Identifier, List[AST.Expression]]] {
-	  def globalFlowFunction(node:CFG.ControlFlowNode, info_in1 : List[Map[AST.Identifier, List[AST.Expression]]], lattice : Lattice.AbstractLattice[Map[AST.Identifier, List[AST.Expression]]])= {
+
+		def getTop : Map[AST.Identifier, List[AST.Expression]] = {
+		top;
+		}
+
+		def compareElements(m1:Map[AST.Identifier, List[AST.Expression]],m2:Map[AST.Identifier, List[AST.Expression]]) : Option[Boolean] = {
+		if(m2.foldLeft(true){case (bool,(key,value)) => var m1values = m1.apply(key);
+														bool && 
+														value.foldLeft(true)((bool,elem) => m1values.contains(elem) && bool)}){
+			Some (true)
+		}else{			
+			if(m1.foldLeft(true){case (bool,(key,value)) => var m2values = m2.apply(key);
+															bool && 
+															value.foldLeft(true)((bool,elem) => m2values.contains(elem) && bool)}){
+				Some (false)
+			}else{
+				None
+			}
+		}
+		}
+
+		def getLub(m1:Map[AST.Identifier, List[AST.Expression]], m2:Map[AST.Identifier, List[AST.Expression]]) : Map[AST.Identifier, List[AST.Expression]] = {
+			m1.foldLeft(Map():Map[AST.Identifier, List[AST.Expression]]){case (map,(key,value)) => map+(key -> value.intersect(m2.apply(key)))}
+		}
+
+
+		def getGlb(m1:Map[AST.Identifier, List[AST.Expression]], m2:Map[AST.Identifier, List[AST.Expression]]) : Map[AST.Identifier, List[AST.Expression]] = {
+			m1.foldLeft(Map():Map[AST.Identifier, List[AST.Expression]]){case (map,(key,value)) => map+(key -> value.union(m2.apply(key)))}																	
+		}
+	  
+	}
+
+	class CSEFlowFunction extends DataFlowAnalysis.DataFlowAnalysis[Map[AST.Identifier, List[AST.Expression]]] {
+	  def globalFlowFunction(node:CFG.ControlFlowNode, info_in1 : List[Map[AST.Identifier, List[AST.Expression]]], lattice : DataFlowAnalysis.DataFlowAnalysis[Map[AST.Identifier, List[AST.Expression]]])= {
 		
 		var info_in = if(info_in1.isEmpty){lattice.getTop::info_in1}else{info_in1}
 		
@@ -90,6 +124,3 @@ object GlobalFlowFunction{
 	  }  
 	}
 }
-
-
-

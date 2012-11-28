@@ -78,16 +78,16 @@ object JSAnalysis {
 	}
 
 	def graphCSE(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-		var lattice = new Lattice.CSELattice(CSE.getCSELatticeBottom(cfg),CSE.getCSELatticeTop(cfg))
-		var gff = new GlobalFlowFunction.CSEFlowFunction;
-		var cse = WorklistAlgorithm.worklistalgorithm(gff,lattice,cfg);	
+		var lattice = new CSEFlowAnalysis.CSELattice(CSE.getCSELatticeBottom(cfg),CSE.getCSELatticeTop(cfg))
+		var gff = new CSEFlowAnalysis.CSEFlowFunction;
+		var cse = DataFlowAnalysis.worklistalgorithm(gff,lattice,cfg);	
 		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
 	}
 
 	def graphLiveness(cfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
 		var analysis = new Liveness.LivenessAnalysis(Liveness.variables(cfg))
-		var liveness = WorklistAlgorithm.worklistalgorithm(analysis,analysis,cfg);	
+		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,analysis,cfg);	
 		GraphvizDrawer.export(Liveness.graph(cfg, liveness), new PrintStream(dir + filename+".live.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".live.gif " + dir + filename+".live.dot")
 	}
@@ -99,7 +99,7 @@ object JSAnalysis {
 			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.graphLiveness, opts.files)
 			case "-graph-cse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, true, opts.graphLiveness, opts.files)
 			case "-graph-liveness" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, true, opts.files)
-			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, arg :: opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, arg :: opts.files)
 		})
 		println("Running analysis with options: "+ opts.toString())
 
