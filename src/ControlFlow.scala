@@ -107,11 +107,11 @@ object ControlFlow {
 			var ((from,to),label) = pair
 			map + (((to,from),label))
 		})
-		var newInfo = cfg.info.functions.foldLeft(Map() : Map[AST.Identifier, CFG.Function])((map,pair) => {
+		var newFuncInfo = cfg.info.functions.foldLeft(Map() : Map[AST.Identifier, CFG.Function])((map,pair) => {
 			var (name,func) = pair
 			map + ((name,reverseFunction(func)))
 		})
-		CFG.ControlFlowGraph(cfg.end, cfg.start, cfg.nodes, newEdges, newLabels, cfg.info)
+		CFG.ControlFlowGraph(cfg.end, cfg.start, cfg.nodes, newEdges, newLabels, CFG.Info(cfg.info.handledContinues,cfg.info.handledBreaks,cfg.info.handledReturns,newFuncInfo))
 	}
 
 	def reverseFunction( func : CFG.Function ) : CFG.Function = {
