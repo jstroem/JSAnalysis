@@ -227,26 +227,39 @@ object CSEGrapher {
 	 }
 
 	 
-	def graph(n : String, cfg : CFG.ControlFlowGraph, cseMap : (Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]])) : GraphvizDrawer.Graph = {
+	def graph(n : String, cfg : CFG.ControlFlowGraph, cseMap : Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]], csfeMap: Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]]], startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
 
 			def nodes() = {
-				cfg.nodes.foldLeft(List(start,end))((list,node) => {
+				var startList = if (startEndNodes) List(start,end) else List()
+				cfg.nodes.foldLeft(startList)((list,node) => {
 					GraphvizDrawer.Node(nodeId( node ), GraphvizDrawer.escape( nodeToString( node ) ) ) :: list
 				})
 			}
 			def edges() = {
-			 	var edge1 = GraphvizDrawer.Edge("start",nodeId(cfg.start))
-			 	var edge2 = GraphvizDrawer.Edge(nodeId(cfg.end),"end")
-				cfg.edges.foldLeft(List(edge1,edge2))((list,edge) => {
+				var startList = if (startEndNodes) {
+					var edge1 = GraphvizDrawer.Edge("start",nodeId(cfg.start))
+			 		var edge2 = GraphvizDrawer.Edge(nodeId(cfg.end),"end")
+			 		List(edge1,edge2)
+				} else {
+					List()
+				}
+				cfg.edges.foldLeft(startList)((list,edge) => {
 					var (from,to) = edge
+					println("From edges: " + cseMap)
 					GraphvizDrawer.Edge(nodeId(from),nodeId(to), Option (cseElemToString(cseMap.get(from,to)))) :: list
 				})
 			}
 			
-			def subgraphs() = List()
+			def subgraphs() = {
+				cfg.info.functions.foldLeft(List() : List[GraphvizDrawer.Graph])((list,pair) => {
+					var (name,func) = pair
+					println(func.name + ": " + csfeMap.getOrElse(func.name,Map()))
+					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg, csfeMap.getOrElse(func.name,Map()),csfeMap,false) :: list
+				})
+			}
 			
 			def name() = n
 		}

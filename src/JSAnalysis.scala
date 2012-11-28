@@ -79,8 +79,12 @@ object JSAnalysis {
 
 	def graphCSE(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
 		var cseAnalyzer = new CommonSubExp.CommonSubExpAnalysis(CommonSubExp.getCSELatticeBottom(cfg),CommonSubExp.getCSELatticeTop(cfg))
-		var cse = DataFlowAnalysis.worklistalgorithm(cseAnalyzer,cfg);	
-		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse), new PrintStream(dir + filename+".cse.dot"))
+		var cse = DataFlowAnalysis.worklistalgorithm(cseAnalyzer,cfg)
+		var csfe = cfg.info.functions.foldLeft(Map() :  Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]]])((map,pair) => {
+			var (name,func) = pair
+			map + ((name,DataFlowAnalysis.worklistalgorithm(cseAnalyzer,func.cfg)))
+		})
+		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse,csfe), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
 	}
 
