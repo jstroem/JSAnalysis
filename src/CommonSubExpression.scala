@@ -12,8 +12,7 @@ object CSE {
 		def expressionType(exp : AST.Expression, expList : List[AST.Expression]) : List[AST.Expression] = {
 			exp match {
 			case AST.ExpressionList (es) => es.foldLeft(expList)((list,exp) => expressionType(exp,list))
-			case AST.AssignmentExpression (e1,op,e2) => println("ASSIGNEXP" + e1 + op + "(" + e2 + ")"); 
-														e2 match {
+			case AST.AssignmentExpression (e1,op,e2) => e2 match {
 															case AST.AssignmentExpression (_,_,_) => 																
 																expressionType(e2, expList)
 															case _ => 
@@ -111,7 +110,8 @@ object CSEGrapher {
  		case CFG.DefaultClause(id) => id
 	 }
 
-	def graph(cfg : CFG.ControlFlowGraph, cseMap : (Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]])) : GraphvizDrawer.Graph = {
+	 
+	def graph(n : String, cfg : CFG.ControlFlowGraph, cseMap : (Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]])) : GraphvizDrawer.Graph = {
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
@@ -130,7 +130,9 @@ object CSEGrapher {
 				})
 			}
 			
-			def name() = "ControlFlowGraph"
+			def subgraphs() = List()
+			
+			def name() = n
 		}
 	}
 	
@@ -147,4 +149,6 @@ object CSEGrapher {
 			case None => "" // not used
 		}
 	}
+	
+	
 }
