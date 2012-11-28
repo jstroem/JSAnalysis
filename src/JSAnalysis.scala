@@ -46,13 +46,13 @@ object JSAnalysis {
 		if (opts.graphAst) graphAST(ast, filename, dir)
    	    
 	    var cfg = ControlFlow.program( ast )
-	    var rcfg = ControlFlow.reverse(cfg)
+	    var rcfg = ControlFlow.reverse( cfg )
 
 		if (opts.graphCfg) graphCFG(cfg, filename, dir)
 
 		if (opts.graphCSE) graphCSE(cfg, filename, dir)
 
-		if (opts.graphLiveness) graphLiveness(rcfg, filename, dir)
+		if (opts.graphLiveness) graphLiveness(cfg, rcfg, filename, dir)
 
 	}
 
@@ -88,9 +88,9 @@ object JSAnalysis {
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
 	}
 
-	def graphLiveness(cfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
+	def graphLiveness(cfg: CFG.ControlFlowGraph, rcfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
 		var analysis = new Liveness.LivenessAnalysis(Liveness.variables(cfg))
-		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,cfg);	
+		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,rcfg);	
 		GraphvizDrawer.export(Liveness.graph(cfg, liveness), new PrintStream(dir + filename+".live.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".live.gif " + dir + filename+".live.dot")
 	}

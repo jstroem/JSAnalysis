@@ -248,7 +248,6 @@ object CSEGrapher {
 				}
 				cfg.edges.foldLeft(startList)((list,edge) => {
 					var (from,to) = edge
-					println("From edges: " + cseMap)
 					GraphvizDrawer.Edge(nodeId(from),nodeId(to), Option (cseElemToString(cseMap.get(from,to)))) :: list
 				})
 			}
@@ -256,7 +255,6 @@ object CSEGrapher {
 			def subgraphs() = {
 				cfg.info.functions.foldLeft(List() : List[GraphvizDrawer.Graph])((list,pair) => {
 					var (name,func) = pair
-					println(func.name + ": " + csfeMap.getOrElse(func.name,Map()))
 					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg, csfeMap.getOrElse(func.name,Map()),csfeMap,false) :: list
 				})
 			}

@@ -17,11 +17,11 @@ object Liveness {
 	  }
 	  
 	  def getLub(m1:List[AST.Identifier], m2:List[AST.Identifier]) : List[AST.Identifier] = {
-	  	m1.union(m2)
+	  	m1.union(m2).distinct
 	  }
 	  
 	  def getGlb(m1: List[AST.Identifier], m2:List[AST.Identifier]) : List[AST.Identifier] = {
-		m1.intersect(m2)
+		m1.intersect(m2).distinct
 	  }
 
 	  def globalFlowFunction(node:CFG.ControlFlowNode, info_in : List[List[AST.Identifier]], dataAnalyzer : DataFlowAnalysis.DataFlowAnalysis[List[AST.Identifier]]) = {
@@ -54,6 +54,7 @@ object Liveness {
 			case CFG.CaseClause(e,_) => expression(e,info)
 			case CFG.DefaultClause(_) => info
 			case CFG.Empty(_) => info
+			case CFG.Break(_) => info
 			case CFG.Merge(_,_) => info
 		}
 	  }
@@ -114,7 +115,7 @@ object Liveness {
 				}
 				cfg.edges.foldLeft(startList)((list,edge) => {
 					var (from,to) = edge
-					GraphvizDrawer.Edge(CFGGrapher.nodeId(from),CFGGrapher.nodeId(to), Some(GraphvizDrawer.escape(AST.printList(liveness.getOrElse((from,to),List()),",")))) :: list
+					GraphvizDrawer.Edge(CFGGrapher.nodeId(from),CFGGrapher.nodeId(to), Some(GraphvizDrawer.escape(AST.printList(liveness.getOrElse((to,from),List()),",")))) :: list
 				})
 			}
 
