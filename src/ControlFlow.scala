@@ -98,6 +98,26 @@ object ControlFlow {
 		}	
 	}
 
+	def reverse( cfg : CFG.ControlFlowGraph ) : CFG.ControlFlowGraph = {
+		var newEdges = cfg.edges.foldLeft(List() : List[(CFG.ControlFlowNode,CFG.ControlFlowNode)])((list,edge) => {
+			var (from,to) = edge
+			(to,from) :: list
+		})
+		var newLabels = cfg.labels.foldLeft(Map() : Map[(CFG.ControlFlowNode,CFG.ControlFlowNode),String])((map,pair) => {
+			var ((from,to),label) = pair
+			map + (((to,from),label))
+		})
+		var newInfo = cfg.info.functions.foldLeft(Map() : Map[AST.Identifier, CFG.Function])((map,pair) => {
+			var (name,func) = pair
+			map + ((name,reverseFunction(func)))
+		})
+		CFG.ControlFlowGraph(cfg.end, cfg.start, cfg.nodes, newEdges, newLabels, cfg.info)
+	}
+
+	def reverseFunction( func : CFG.Function ) : CFG.Function = {
+		CFG.Function(func.name, func.params, func.start, func.end, func.returns, reverse(func.cfg))
+	}
+
 	def addFunction(cfg: CFG.ControlFlowGraph, func: CFG.Function) : CFG.ControlFlowGraph = {
 		CFG.ControlFlowGraph(
 			cfg.start,
@@ -288,7 +308,6 @@ object ControlFlow {
 							}
 						})
 					})
-
 					CFG.ControlFlowGraph(cfg.start,cfg.end,newNodes,appendNewEdges,appendNewLabels,cfg.info)
 				}
 				case _ => cfg
@@ -506,7 +525,7 @@ object ControlFlow {
 			case Some(p) => p
 			case None => List()
 		}
-		var (cfg,returns) = convertReturns( statement(fd.body) )
+		var (cfg,returns) = convertReturns( removeEmptyNodes(statement(fd.body)) )
 		CFG.Function(fd.name.getOrElse(AST.Identifier("unnamed")), params, cfg.start, cfg.end, returns, cfg)
 	}
 
@@ -518,7 +537,8 @@ object ControlFlow {
 		se match {
 			case AST.ExpressionStatement( fe: AST.FunctionExpression ) => addFunction(cfg, functionDeclaration ( fe ))
 			case se : AST.Statement => statement( se ) :: cfg
-			case se : AST.FunctionExpression => addFunction(cfg,functionDeclaration( se ))
+			case se:  AST.FunctionExpression => addFunction(cfg, functionDeclaration ( se ))
+			case _ => cfg
 		}
 	}
 
@@ -563,26 +583,39 @@ object CFGGrapher {
  		case CFG.DefaultClause(id) => id
 	 }
 
-	def graph(cfg : CFG.ControlFlowGraph) : GraphvizDrawer.Graph = {
+	def graph(n : String, cfg : CFG.ControlFlowGraph, startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
 
 			def nodes() = {
-				cfg.nodes.foldLeft(List(start,end))((list,node) => {
+				var startList = if (startEndNodes) List(start,end) else List()
+				cfg.nodes.foldLeft(startList)((list,node) => {
 					GraphvizDrawer.Node(nodeId( node ), GraphvizDrawer.escape( nodeToString( node ) ) ) :: list
 				})
 			}
 			def edges() = {
-			 	var edge1 = GraphvizDrawer.Edge("start",nodeId(cfg.start))
-			 	var edge2 = GraphvizDrawer.Edge(nodeId(cfg.end),"end")
-				cfg.edges.foldLeft(List(edge1,edge2))((list,edge) => {
+				var startList = if (startEndNodes) {
+					var edge1 = GraphvizDrawer.Edge("start",nodeId(cfg.start))
+			 		var edge2 = GraphvizDrawer.Edge(nodeId(cfg.end),"end")
+			 		List(edge1,edge2)
+				} else {
+					List()
+				}
+				cfg.edges.foldLeft(startList)((list,edge) => {
 					var (from,to) = edge
 					GraphvizDrawer.Edge(nodeId(from),nodeId(to), cfg.labels.get((from,to))) :: list
 				})
 			}
+
+			def subgraphs() = {
+				cfg.info.functions.foldLeft(List() : List[GraphvizDrawer.Graph])((list,pair) => {
+					var (name,func) = pair
+					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg,false) :: list
+				})
+			}
 			
-			def name() = "ControlFlowGraph"
+			def name() = n
 		}
 	}
 }

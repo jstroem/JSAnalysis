@@ -58,7 +58,7 @@ object AST {
 	  }
 
 	  override def toString() = {
-	  	"function " + name.foreach((x) => x.toString()) + "("+ printOptList(params,",")+")" + body.toString()
+	  	"function " + name.getOrElse("") + "("+ printOptList(params,",")+")" + body.toString()
 	  }
 	}
 
@@ -580,6 +580,8 @@ object ASTGrapher {
 		override def edges() : List[GraphvizDrawer.Edge] = this.edgeList.foldLeft(List() : List[GraphvizDrawer.Edge])((list,edge) => {
 				GraphvizDrawer.Edge(edge.from.idString(), edge.to.idString(), Some(edge.label)) :: list
 			})
+
+		override def subgraphs() : List[GraphvizDrawer.Graph] = List()
 
 		def addNode(name: String, attributes: List[(String, String)], level: Int) = {
 			val node = new GraphNode(name, attributes, counter, level)
