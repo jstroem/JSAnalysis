@@ -28,6 +28,7 @@ object GraphvizDrawer {
 
 	def escape(s :String) : String = {
 		s.map(_ match { 
+			  case '\n' => "\\n"
 	          case '\'' => "&apos;"
 	          case '"' => "&quot;"
 	          case '<' => "&lt;"
