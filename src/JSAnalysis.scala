@@ -78,16 +78,15 @@ object JSAnalysis {
 	}
 
 	def graphCSE(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-		var lattice = new CSEFlowAnalysis.CSELattice(CSE.getCSELatticeBottom(cfg),CSE.getCSELatticeTop(cfg))
-		var gff = new CSEFlowAnalysis.CSEFlowFunction;
-		var cse = DataFlowAnalysis.worklistalgorithm(gff,lattice,cfg);	
+		var cseAnalyzer = new CommonSubExp.CommonSubExpAnalysis(CommonSubExp.getCSELatticeBottom(cfg),CommonSubExp.getCSELatticeTop(cfg))
+		var cse = DataFlowAnalysis.worklistalgorithm(cseAnalyzer,cfg);	
 		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
 	}
 
 	def graphLiveness(cfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
 		var analysis = new Liveness.LivenessAnalysis(Liveness.variables(cfg))
-		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,analysis,cfg);	
+		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,cfg);	
 		GraphvizDrawer.export(Liveness.graph(cfg, liveness), new PrintStream(dir + filename+".live.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".live.gif " + dir + filename+".live.dot")
 	}

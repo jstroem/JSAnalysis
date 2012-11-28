@@ -24,64 +24,66 @@ object Liveness {
 		m1.intersect(m2)
 	  }
 
-	  def globalFlowFunction(node:CFG.ControlFlowNode, info_out : List[AST.Identifier], lattice : DataFlowAnalysis.DataFlowAnalysis[List[AST.Identifier]])= node match {
-	//		case CFG.Merge(_,_) => lattice.getGlb(info_in(0),info_in(1)) //TODO
-			case CFG.Continue(oi,_) => info_out
+	  def globalFlowFunction(node:CFG.ControlFlowNode, info_in : List[List[AST.Identifier]], dataAnalyzer : DataFlowAnalysis.DataFlowAnalysis[List[AST.Identifier]]) = {
+		var info = info_in.foldLeft(dataAnalyzer.getBottom)((info1,info2) => dataAnalyzer.getLub(info1,info2))
+		node match {
+			case CFG.Continue(oi,_) => info
 			case CFG.Return(e,_) => e match {
-				case Some(e) => expression(e,info_out)
-				case None => info_out
+				case Some(e) => expression(e,info)
+				case None => info
 			}
-			case CFG.Expression(e,_) => expression(e,info_out)
+			case CFG.Expression(e,_) => expression(e,info)
 			case CFG.Assignment(i,oe,_) => oe match {
 											case Some (e) => {
-												if (info_out.contains(i)) {
-													expression(e,info_out.filter((node) => node != i))
+												if (info.contains(i)) {
+													expression(e,info.filter((node) => node != i))
 												} else {
-													info_out
+													info
 												}
 											}
-											case None => info_out
+											case None => info
 			}
-			case CFG.If(e,_) => expression(e,info_out)
-			case CFG.DoWhile(e,_) => expression(e,info_out)
+			case CFG.If(e,_) => expression(e,info)
+			case CFG.DoWhile(e,_) => expression(e,info)
 			case CFG.ForIn(e1,e2,_) => e1 match { // e1 is an variable here and is only defined in the for statement so it should just be removed from the info.
-				case e1 : AST.Identifier => expression(e2,info_out.filter((node) => node != e1))
-				case _ => expression(e2,info_out) 
+				case e1 : AST.Identifier => expression(e2,info.filter((node) => node != e1))
+				case _ => expression(e2,info) 
 			}
-			case CFG.With(e,_) => expression(e,info_out)
-			case CFG.Switch(e,_) => expression(e,info_out)
-			case CFG.CaseClause(e,_) => expression(e,info_out)
-			case CFG.DefaultClause(_) => info_out
-			case CFG.Empty(_) => info_out
-			case CFG.Merge(_,_) => info_out
+			case CFG.With(e,_) => expression(e,info)
+			case CFG.Switch(e,_) => expression(e,info)
+			case CFG.CaseClause(e,_) => expression(e,info)
+			case CFG.DefaultClause(_) => info
+			case CFG.Empty(_) => info
+			case CFG.Merge(_,_) => info
 		}
-	}
+	  }
 
-	def expression(e : AST.Expression, info_out: List[AST.Identifier]) : List[AST.Identifier] = e match {
-		case AST.ExpressionList(lst) => lst.foldLeft(info_out)((list,exp) => expression(exp,list))
+	def expression(e : AST.Expression, info_in: List[AST.Identifier]) : List[AST.Identifier] = e match {
+		case AST.ExpressionList(lst) => lst.foldLeft(info_in)((list,exp) => expression(exp,list))
 		case AST.AssignmentExpression(lhs, op, rhs) => lhs match {
 			case lhs: AST.Identifier => {
-				if (info_out.contains(lhs)) {
-					expression(rhs,info_out.filter((node) => node != lhs))
+				if (info_in.contains(lhs)) {
+					expression(rhs,info_in.filter((node) => node != lhs))
 				} else {
-					info_out
+					info_in
 				}
 			}
-			case _ => expression(rhs,info_out) //Cant figure anything out so every item used in the rhs is in use
+			case _ => expression(rhs,info_in) //Cant figure anything out so every item used in the rhs is in use
 		}
-		case AST.FunctionExpression(name, params, body) => info_out
-		case AST.BinaryExpression(op, t1, t2) => expression(t2,expression(t1,info_out))
-		case AST.UnaryExpression(op, t1) => expression(t1,info_out)
-		case AST.PostfixExpression(op, t1) => info_out // x = x + 1 does remove x and adds x. so nothing needs to be done
-		case AST.ConditionalExpression(cond, ifBranch, elseBranch) => expression(elseBranch,expression(ifBranch,expression(cond,info_out)))
-		case AST.CallExpression(callable, args) => args.getOrElse(List()).foldLeft(expression(callable,info_out))((list,exp) => expression(exp,list))
-		case AST.AllocationExpression(exp) => expression(exp,info_out)
-		case AST.ArrayAccessExpression(e1,e2) => expression(e2,expression(e1,info_out))
-		case AST.ObjectAccessExpression(obj, member) => expression(obj,info_out)
-		case AST.Undefined() => info_out
-		case e : AST.Identifier => if (info_out.contains(e)) info_out else e :: info_out
-		case e : AST.Literal => info_out
+		case AST.FunctionExpression(name, params, body) => info_in
+		case AST.BinaryExpression(op, t1, t2) => expression(t2,expression(t1,info_in))
+		case AST.UnaryExpression(op, t1) => expression(t1,info_in)
+		case AST.PostfixExpression(op, t1) => info_in // x = x + 1 does remove x and adds x. so nothing needs to be done
+		case AST.ConditionalExpression(cond, ifBranch, elseBranch) => expression(elseBranch,expression(ifBranch,expression(cond,info_in)))
+		case AST.CallExpression(callable, args) => args.getOrElse(List()).foldLeft(expression(callable,info_in))((list,exp) => expression(exp,list))
+		case AST.AllocationExpression(exp) => expression(exp,info_in)
+		case AST.ArrayAccessExpression(e1,e2) => expression(e2,expression(e1,info_in))
+		case AST.ObjectAccessExpression(obj, member) => expression(obj,info_in)
+		case AST.Undefined() => info_in
+		case e : AST.Identifier => if (info_in.contains(e)) info_in else e :: info_in
+		case e : AST.Literal => info_in
 	}
+  }
 
 	def variables(cfg : CFG.ControlFlowGraph) : List[AST.Identifier] = {
 		cfg.nodes.foldLeft(List() : List[AST.Identifier])((list,node) => node match {
@@ -126,5 +128,4 @@ object Liveness {
 			def name() = n
 		}
 	}
-
 }
