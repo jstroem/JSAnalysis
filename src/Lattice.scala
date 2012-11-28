@@ -1,7 +1,7 @@
 package JSAnalyzer
 
 	object Lattice {
-	abstract class AbstractLattice[t](botm : t, tp : t) {
+	abstract class AbstractLattice[t] {
 	   	  
 	  def getBottom : t
 	  
@@ -15,7 +15,7 @@ package JSAnalyzer
 	
 	}
 
-	class CSELattice(bottom : Map[AST.Identifier, List[AST.Expression]], top: Map[AST.Identifier, List[AST.Expression]]) extends Lattice.AbstractLattice[Map[AST.Identifier, List[AST.Expression]]](bottom, top){
+	class CSELattice(bottom : Map[AST.Identifier, List[AST.Expression]], top: Map[AST.Identifier, List[AST.Expression]]) extends Lattice.AbstractLattice[Map[AST.Identifier, List[AST.Expression]]] {
 			  
 		  def getBottom : Map[AST.Identifier, List[AST.Expression]] = {
 			bottom;
