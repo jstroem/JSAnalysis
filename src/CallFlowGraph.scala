@@ -1,4 +1,4 @@
-package JSAnalyzer
+/*package JSAnalyzer
 
 import java.util.UUID
 
@@ -10,7 +10,7 @@ import java.util.UUID
 **/
 
 object CallFG {
-	case class Node
+	abstract class Node
 	case class MainNode(id: String = UUID.randomUUID().toString()) extends Node
 	case class FunctionNode(func: AST.Identifier, params: List[AST.Identifer], id: String = UUID.randomUUID().toString()) extends Node
 
@@ -35,12 +35,12 @@ object CallFG {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
 
-			def nodeToString(node) => node match {
+			def nodeToString(node : Node) = node match {
 				case MainNode(id) => "MAIN"
 				case FunctionNode(func,params,id) => func.value +"("+AST.printList(params,",")+")"
 			}
 
-			def nodeId(node) => node match {
+			def nodeId(node : Node) = node match {
 				case MainNode(id) => id
 				case FunctionNode(_,_,id) => id
 			}
@@ -65,11 +65,12 @@ object CallFG {
 					case None => List()
 				}
 				cfg.edges.foldLeft(startList)((list,edge) => {
-					edge match {
+					/*edge match {
 						case 
-					}
-					var (from,to) = edge
-					GraphvizDrawer.Edge(nodeId(from),nodeId(to), ) :: list
+					}*/
+					/*var (from,to) = edge
+					GraphvizDrawer.Edge(nodeId(from),nodeId(to), ) :: list*/
+					list
 				})
 			}
 
@@ -84,4 +85,4 @@ object CallFG {
 		}
 	}
 
-}
+}*/
