@@ -93,8 +93,7 @@ object Liveness {
 		})
 	}
 
-	def graph(cfg : CFG.ControlFlowGraph, liveness: Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]],startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
-		var n = "ControlFlowGraph"
+	def graph(n: String, cfg : CFG.ControlFlowGraph, liveness: Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]], fliveness: Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]]],startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
 		new GraphvizDrawer.Graph {
 			var start = GraphvizDrawer.Node("start", "Start", Some(GraphvizDrawer.Diamond()))
 			var end = GraphvizDrawer.Node("end", "End", Some(GraphvizDrawer.Square()))
@@ -115,16 +114,16 @@ object Liveness {
 				}
 				cfg.edges.foldLeft(startList)((list,edge) => {
 					var (from,to) = edge
-					GraphvizDrawer.Edge(CFGGrapher.nodeId(from),CFGGrapher.nodeId(to), Some(GraphvizDrawer.escape(AST.printList(liveness.getOrElse((to,from),List()),",")))) :: list
+					GraphvizDrawer.Edge(CFGGrapher.nodeId(from),CFGGrapher.nodeId(to), Some(GraphvizDrawer.escape("{"+AST.printList(liveness.getOrElse((to,from),List()),",")+"}"))) :: list
 				})
 			}
 
-			def subgraphs() = List()/*{
+			def subgraphs() = {
 				cfg.info.functions.foldLeft(List() : List[GraphvizDrawer.Graph])((list,pair) => {
 					var (name,func) = pair
-					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg,false) :: list
+					graph(func.name + "("+AST.printList(func.params,", ")+")",func.cfg, fliveness.getOrElse(func.name,Map()), fliveness,false) :: list
 				})
-			}*/
+			}
 			
 			def name() = n
 		}

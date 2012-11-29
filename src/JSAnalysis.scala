@@ -90,8 +90,12 @@ object JSAnalysis {
 
 	def graphLiveness(cfg: CFG.ControlFlowGraph, rcfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
 		var analysis = new Liveness.LivenessAnalysis(Liveness.variables(cfg))
-		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,rcfg);	
-		GraphvizDrawer.export(Liveness.graph(cfg, liveness), new PrintStream(dir + filename+".live.dot"))
+		var live = DataFlowAnalysis.worklistalgorithm(analysis,rcfg);	
+		var flive = rcfg.info.functions.foldLeft(Map() :  Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]]])((map,pair) => {
+			var (name,func) = pair
+			map + ((func.name,DataFlowAnalysis.worklistalgorithm(analysis,func.cfg)))
+		})
+		GraphvizDrawer.export(Liveness.graph("LivenessAnalysis", cfg, live, flive), new PrintStream(dir + filename+".live.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".live.gif " + dir + filename+".live.dot")
 	}
 	
