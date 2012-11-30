@@ -106,9 +106,19 @@ object JSAnalysis {
 	
 	def graphDom(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
 	    val analysis = new Dominance.DominanceConstructor(cfg)
-	    val dominance = analysis()
-		GraphvizDrawer.export(CFGGrapher.graph("Dominance", Dominance.makeGraph(cfg, dominance)), new PrintStream(dir + filename+".dom.dot"))
+	    val dominance = analysis.dom()
+	    //println("Constructed dominance")
+	    val idom = analysis.idom(dominance)
+	    //println("Found idoms")
+	    //analysis.printIDom(idom)
+	    val df = analysis.domFront(idom)
+	    //println("Found domFront")
+	    //analysis.printDF(df)
+		GraphvizDrawer.export(CFGGrapher.graph("Dom", Dominance.makeGraph(cfg, dominance)), new PrintStream(dir + filename+".dom.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".dom.gif " + dir + filename+".dom.dot")
+		
+		GraphvizDrawer.export(CFGGrapher.graph("IDom", Dominance.makeGraph(cfg, idom)), new PrintStream(dir + filename+".idom.dot"))
+		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".idom.gif " + dir + filename+".idom.dot")
 	}
 	
 	def main(args : Array[String]) = {
