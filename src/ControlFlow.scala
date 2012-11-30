@@ -2,13 +2,6 @@ package JSAnalyzer
 
 import java.util.UUID
 
-/** TODO: 
-	* Remove Empty nodes
-	* functionDeclaration
-	* CaseBlocks should be walked though and if a break is caught this should be updated
-	* Continue and breaks needs to be dealt with
-**/
-
 object CFG {
 	abstract class ControlFlowNode()
 	// Each statement has their own type 

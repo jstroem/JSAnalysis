@@ -86,7 +86,8 @@ object JSAnalysis {
 		var cse = DataFlowAnalysis.worklistalgorithm(cseAnalyzer,cfg)
 		var csfe = cfg.info.functions.foldLeft(Map() :  Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]]])((map,pair) => {
 			var (name,func) = pair
-			map + ((name,DataFlowAnalysis.worklistalgorithm(cseAnalyzer,func.cfg)))
+			var csfeAnalyzer = new CommonSubExp.CommonSubExpAnalysis(CommonSubExp.getCSELatticeBottom(func.cfg),CommonSubExp.getCSELatticeTop(func.cfg))
+			map + ((func.name,DataFlowAnalysis.worklistalgorithm(csfeAnalyzer,func.cfg)))
 		})
 		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse,csfe), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
@@ -94,8 +95,12 @@ object JSAnalysis {
 
 	def graphLiveness(cfg: CFG.ControlFlowGraph, rcfg: CFG.ControlFlowGraph, filename: String, dir: String ) : Unit = {
 		var analysis = new Liveness.LivenessAnalysis(Liveness.variables(cfg))
-		var liveness = DataFlowAnalysis.worklistalgorithm(analysis,rcfg);	
-		GraphvizDrawer.export(Liveness.graph(cfg, liveness), new PrintStream(dir + filename+".live.dot"))
+		var live = DataFlowAnalysis.worklistalgorithm(analysis,rcfg);	
+		var flive = rcfg.info.functions.foldLeft(Map() :  Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode),List[AST.Identifier]]])((map,pair) => {
+			var (name,func) = pair
+			map + ((func.name,DataFlowAnalysis.worklistalgorithm(analysis,func.cfg)))
+		})
+		GraphvizDrawer.export(Liveness.graph("LivenessAnalysis", cfg, live, flive), new PrintStream(dir + filename+".live.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".live.gif " + dir + filename+".live.dot")
 	}
 	
