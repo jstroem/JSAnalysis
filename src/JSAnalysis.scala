@@ -1,5 +1,6 @@
 import JSAnalyzer._
 import java.io._
+import JSAnalyzer.DefUseChain
 
 object JSAnalysis {
 	case class RuntimeOpts(
@@ -9,6 +10,7 @@ object JSAnalysis {
 			graphCSE: Boolean = false, 
 			graphLiveness: Boolean = false, 
 			graphDom: Boolean = false,
+			graphDefUse: Boolean = false,
 		 	files: List[String] = List()) {
 		override def toString() = {
 			"" +(if (printAst) "printAst " else "") + 
@@ -16,7 +18,8 @@ object JSAnalysis {
 				(if (graphCfg) "graphCfg " else "") + 
 				(if (graphCSE) "graphCSE " else "") +
 				(if (graphLiveness) "graphLiveness " else "") +
-				(if (graphDom) "graphDom " else "")
+				(if (graphDom) "graphDom " else "") +
+				(if (graphDefUse) "graphDefUse " else "")
 		}
 	}
 
@@ -58,6 +61,7 @@ object JSAnalysis {
 
 		if (opts.graphDom) graphDom(cfg, filename, dir)
 		
+		if (opts.graphDefUse) graphDefUse(cfg, filename, dir)
 	}
 
 	def makeAst(file: File) : AST.Program = {
@@ -121,15 +125,25 @@ object JSAnalysis {
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".idom.gif " + dir + filename+".idom.dot")
 	}
 	
+	def graphDefUse(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
+	  val reachingDefs = new DefUseChain.ReachingDefs(DefUseChain.getRDLatticeBottom(cfg), DefUseChain.getRDLatticeTop(cfg))
+	  val analysis = DataFlowAnalysis.worklistalgorithm(reachingDefs, cfg)
+	  val defUseChain = reachingDefs.useDefChain(cfg, analysis)
+	  
+	  GraphvizDrawer.export(CFGGrapher.graph("Dom", DefUseChain.makeGraph(cfg, defUseChain)), new PrintStream(dir + filename+".duc.dot"))
+	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".duc.gif " + dir + filename+".duc.dot")
+	}
+	
 	def main(args : Array[String]) = {
 		val opts = args.foldLeft(RuntimeOpts())((opts,arg) => arg match {
-			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.files)
-			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.files)
-			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.files)
-			case "-graph-cse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, true, opts.graphLiveness, opts.graphDom, opts.files)
-			case "-graph-liveness" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, true, opts.graphDom, opts.files)
-			case "-graph-dom" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, true, opts.files)
-			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, arg :: opts.files)
+			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.graphDefUse, opts.files)
+			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.graphDefUse, opts.files)
+			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.graphDefUse, opts.files)
+			case "-graph-cse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, true, opts.graphLiveness, opts.graphDom, opts.graphDefUse, opts.files)
+			case "-graph-liveness" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, true, opts.graphDom, opts.graphDefUse, opts.files)
+			case "-graph-dom" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, true, opts.graphDefUse, opts.files)
+			case "-graph-defuse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, true, opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphDom, opts.graphDefUse, arg :: opts.files)
 		})
 		println("Running analysis with options: "+ opts.toString())
 

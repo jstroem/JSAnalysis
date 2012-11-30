@@ -3,7 +3,7 @@
 make: compile
 
 run:
-	scala JSAnalysis -print-ast -graph-ast -graph-cfg -graph-cse -graph-dom test/*.js
+	scala JSAnalysis -print-ast -graph-ast -graph-cfg -graph-cse -graph-dom -graph-defuse test/*.js
 
 clean:
 	rm -Rf *.class test/*.ast test/*.gif test/*.dot JSAnalyzer
