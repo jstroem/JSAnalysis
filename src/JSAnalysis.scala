@@ -82,7 +82,8 @@ object JSAnalysis {
 		var cse = DataFlowAnalysis.worklistalgorithm(cseAnalyzer,cfg)
 		var csfe = cfg.info.functions.foldLeft(Map() :  Map[AST.Identifier, Map[(CFG.ControlFlowNode, CFG.ControlFlowNode), Map[AST.Identifier, List[AST.Expression]]]])((map,pair) => {
 			var (name,func) = pair
-			map + ((name,DataFlowAnalysis.worklistalgorithm(cseAnalyzer,func.cfg)))
+			var csfeAnalyzer = new CommonSubExp.CommonSubExpAnalysis(CommonSubExp.getCSELatticeBottom(func.cfg),CommonSubExp.getCSELatticeTop(func.cfg))
+			map + ((func.name,DataFlowAnalysis.worklistalgorithm(csfeAnalyzer,func.cfg)))
 		})
 		GraphvizDrawer.export(CSEGrapher.graph("CSEFlowGraph", cfg, cse,csfe), new PrintStream(dir + filename+".cse.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cse.gif " + dir + filename+".cse.dot")
