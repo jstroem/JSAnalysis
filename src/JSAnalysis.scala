@@ -130,6 +130,10 @@ object JSAnalysis {
 	  val analysis = DataFlowAnalysis.worklistalgorithm(reachingDefs, cfg)
 	  val defUseChain = reachingDefs.useDefChain(cfg, analysis)
 	  
+	  //println(DefUseChain.printChain(defUseChain))
+	  //println(DefUseChain.printReachingDefs(analysis))
+	  //println(DefUseChain.printAssignedVars(reachingDefs.assignedVars))
+	  
 	  GraphvizDrawer.export(CFGGrapher.graph("Dom", DefUseChain.makeGraph(cfg, defUseChain)), new PrintStream(dir + filename+".duc.dot"))
 	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".duc.gif " + dir + filename+".duc.dot")
 	}

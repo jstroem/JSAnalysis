@@ -18,10 +18,6 @@ object Dominance {
       info_out.union(Set(node))
     }
     
-    def printWorklist(worklist : List[CFG.ControlFlowNode]) = {
-      "[ " + worklist.map(CFGGrapher.nodeToString(_)).mkString(", ") + " ]"
-    }
-    
     def dom() : infoT = {
       val worklistStart: List[CFG.ControlFlowNode] = cfg.nodes
       val mapStart = cfg.nodes.map { n : CFG.ControlFlowNode => if (n != cfg.nodes.head) (n, bottom) else (n, Set(n)) } toMap
@@ -91,6 +87,10 @@ object Dominance {
         println("Idom(" + CFGGrapher.nodeToString(key) + ") = " + printWorklist(value toList))
       }}
     }
+  }
+  
+  def printWorklist(worklist : List[CFG.ControlFlowNode]) = {
+    "[ " + worklist.map(CFGGrapher.nodeToString(_)).mkString(", ") + " ]"
   }
   
   def makeGraph(cfg : CFG.ControlFlowGraph, dominance : infoT) : CFG.ControlFlowGraph = {

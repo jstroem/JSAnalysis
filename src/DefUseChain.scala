@@ -9,11 +9,11 @@ object DefUseChain {
     var assignedVars = Map[CFG.ControlFlowNode, List[AST.Identifier]]()
     
     def getBottom = {
-      bottom;
+      bottom
     }
 
     def getTop = {
-      top;
+      top
     }
     
     def compareElements(m1 : Domain, m2 : Domain) : Option[Boolean] = {
@@ -34,16 +34,34 @@ object DefUseChain {
       m1.map { case (key, value) => (key, value.intersect(m2(key))) } toMap
     }
     
+    def printInfo(info: Domain) = {
+      info.map({
+        case (v, dn) => {
+          v.value + " -> [ " + dn.map({ CFGGrapher.nodeToString(_) }).mkString(", ") + " ]"
+        }
+      }).mkString(", ")
+    }
+    
     def globalFlowFunction(node : CFG.ControlFlowNode, info_in1 : List[Domain], 
         lattice : DataFlowAnalysis.DataFlowAnalysis[Domain]) = {		
-      val info_in = if (info_in1.isEmpty) lattice.getTop::info_in1 else info_in1
+      val info_in = if (info_in1.isEmpty) lattice.getBottom::info_in1 else info_in1
       
       node match {
         case CFG.Merge(_,_) => info_in.foldLeft(lattice.getBottom)((map, e) => lattice.getLub(map, e))
         case _ => {
           val vars = getAssignedVars(node)
-          val changedVars = info_in.head.filter({ case (key, value) => vars.contains(key) }).map{ case (key, value) => key }
-          (info_in.head -- changedVars) ++ (changedVars.map { (_, Set(node)) } toMap)
+          val changedVars = info_in.head.filter({ case (key, value) => vars.contains(key) }).keys
+          //println(CFGGrapher.nodeToString(node) + " : " + changedVars.map(_.value).mkString(", "))
+          println("Node: " + CFGGrapher.nodeToString(node))
+          println("Original: " + printInfo(info_in.head))
+          val killed = (info_in.head -- changedVars)
+          val added = (vars.map { (_, Set(node)) } toMap)
+          val res = killed ++ added
+          println("Remaining: " + printInfo(killed))
+          println("Added: " + printInfo(added))
+          println("New: " + printInfo(res))
+          println("---")
+          res
         }
       }
     }
@@ -99,7 +117,7 @@ object DefUseChain {
         case CFG.If(e, _) => expressionType(e, list)
         case CFG.DoWhile(e, _) => expressionType(e, list)
         case CFG.ForIn(e1, e2, _) => e1 match {
-          case e1: AST.Expression => expressionType(e2, expressionType(e1, list))
+          case e1: AST.Identifier => e1 :: expressionType(e2, list)
           case _ => expressionType(e2, list)
         }
         case CFG.With(e, _) => expressionType(e, list)
@@ -155,10 +173,7 @@ object DefUseChain {
         }
         case CFG.If(e, _) => expressionType(e, list)
         case CFG.DoWhile(e, _) => expressionType(e, list)
-        case CFG.ForIn(e1, e2, _) => e1 match {
-          case e1: AST.Expression => expressionType(e2, expressionType(e1, list))
-          case _ => expressionType(e2, list)
-        }
+        case CFG.ForIn(e1, e2, _) => expressionType(e2, list)
         case CFG.With(e, _) => expressionType(e, list)
         case CFG.Switch(e, _) => expressionType(e, list)
         case CFG.CaseClause(e, _) => expressionType(e, list)
@@ -179,6 +194,27 @@ object DefUseChain {
         }))
       } toMap
     }
+  }
+  
+  def printChain(chain : Map[CFG.ControlFlowNode, Domain]) = {
+    chain.map({
+      case (node, defs) => CFGGrapher.nodeToString(node) + " : " + defs.map({ 
+        case (v, dn) => v.value + " -> " + Dominance.printWorklist(dn toList) }).mkString(", ")
+    }).mkString("\n")
+  }
+  
+  def printAssignedVars(vars : Map[CFG.ControlFlowNode, List[AST.Identifier]]) = {
+    vars.map({
+      case (node, vars) => CFGGrapher.nodeToString(node) + " : " + vars.map(_.value).mkString(", ")
+    }).mkString("\n")
+  }
+  
+  def printReachingDefs(rDefs : Map[Edge, Domain]) = {
+    rDefs.map({
+      case ((from, to), defs) => "(" + CFGGrapher.nodeToString(from) + " -> " + CFGGrapher.nodeToString(to) + ") : " + defs.map({
+        case (v, dn) => v.value + " -> " + Dominance.printWorklist(dn toList) 
+      }).mkString(", ")
+    }).mkString("\n")
   }
 
   def getRDLatticeBottom(cfg: CFG.ControlFlowGraph): Domain = {
