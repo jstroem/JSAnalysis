@@ -5,8 +5,12 @@ object DefUseChain {
   type Domain = Map[AST.Identifier, Set[CFG.ControlFlowNode]]
   type Edge = (CFG.ControlFlowNode, CFG.ControlFlowNode)
   
-  class ReachingDefs(bottom : Domain, top: Domain) extends DataFlowAnalysis.DataFlowAnalysis[Domain] {
-    var assignedVars = Map[CFG.ControlFlowNode, List[AST.Identifier]]()
+  class ReachingDefs(cfg : CFG.ControlFlowGraph) extends DataFlowAnalysis.DataFlowAnalysis[Domain] {
+    lazy val bottom = getRDLatticeBottom()
+    lazy val top = getRDLatticeTop()
+    
+    lazy val assignedVars = cfg.nodes.map(n => (n, getAssignedVars(n))).toMap
+    lazy val vars = assignedVars.values.foldLeft(List[AST.Identifier]())({ (soFar, e) => soFar.union(e) }).distinct
     
     def getBottom = {
       bottom
@@ -49,34 +53,31 @@ object DefUseChain {
       node match {
         case CFG.Merge(_,_) => info_in.foldLeft(lattice.getBottom)((map, e) => lattice.getLub(map, e))
         case _ => {
-          val vars = getAssignedVars(node)
+          val vars = assignedVars(node)
           val changedVars = info_in.head.filter({ case (key, value) => vars.contains(key) }).keys
           //println(CFGGrapher.nodeToString(node) + " : " + changedVars.map(_.value).mkString(", "))
-          println("Node: " + CFGGrapher.nodeToString(node))
-          println("Original: " + printInfo(info_in.head))
+          //println("Node: " + CFGGrapher.nodeToString(node))
+          //println("Original: " + printInfo(info_in.head))
           val killed = (info_in.head -- changedVars)
           val added = (vars.map { (_, Set(node)) } toMap)
           val res = killed ++ added
-          println("Remaining: " + printInfo(killed))
-          println("Added: " + printInfo(added))
-          println("New: " + printInfo(res))
-          println("---")
+          //println("Remaining: " + printInfo(killed))
+          //println("Added: " + printInfo(added))
+          //println("New: " + printInfo(res))
+          //println("---")
           res
         }
       }
     }
-    
-    // TODO: refactor / rewrite
+
     def getAssignedVars (node: CFG.ControlFlowNode) : List[AST.Identifier] = {
-      if (assignedVars.contains(node)) {
-        return assignedVars(node)
-      }
-      
       def expressionType(exp : AST.Expression, vars : List[AST.Identifier]) : List[AST.Identifier] = {
         exp match {
           case AST.ExpressionList(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
           case AST.AssignmentExpression(e1, op, e2) => e1 match {
             case e : AST.Identifier => e :: vars
+            case AST.ArrayAccessExpression(i : AST.Identifier, e2) => expressionType(e2, i :: vars)
+            case AST.ObjectAccessExpression(i : AST.Identifier, i2) => i :: vars
             case _ => vars
           }
           case AST.BinaryExpression(op, e1, e2) => expressionType(e2, expressionType(e1, vars))
@@ -100,7 +101,7 @@ object DefUseChain {
 
       val list = List[AST.Identifier]()
       
-      val res = (node match {
+      (node match {
         case CFG.Continue(oe, _) => oe match {
           case Some(e) => expressionType(e, list)
           case None => list
@@ -125,16 +126,18 @@ object DefUseChain {
         case CFG.CaseClause(e, _) => expressionType(e, list)
         case _ => list;
       }) 
-      
-      assignedVars = assignedVars + (node -> res)
-      res; 
     }
     
     def getUsedVars(cfg: CFG.ControlFlowGraph) : Map[CFG.ControlFlowNode, Set[AST.Identifier]] = {
       def expressionType(exp : AST.Expression, vars : Set[AST.Identifier]) : Set[AST.Identifier] = {
         exp match {
           case AST.ExpressionList(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
-          case AST.AssignmentExpression(e1, op, e2) => expressionType(e2, vars)
+          case AST.AssignmentExpression(e1, op, e2) => e1 match {
+            case i : AST.Identifier => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
+            case AST.ArrayAccessExpression(i : AST.Identifier, e) => if (op != "=") expressionType(e2, expressionType(e, vars)) + i else expressionType(e2, expressionType(e, vars))
+            case AST.ObjectAccessExpression(i : AST.Identifier, i2) => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
+            case _ => expressionType(e2, expressionType(e1, vars))
+          }
           case AST.BinaryExpression(op, e1, e2) => expressionType(e2, expressionType(e1, vars))
           case AST.UnaryExpression(op, e) => expressionType(e, vars)
           case AST.PostfixExpression(op, e) => expressionType(e, vars)
@@ -194,6 +197,14 @@ object DefUseChain {
         }))
       } toMap
     }
+
+    def getRDLatticeBottom() : Domain = {
+      vars map { (_, Set[CFG.ControlFlowNode]()) } toMap
+    }
+
+    def getRDLatticeTop() : Domain = {
+      vars map { (_, cfg.nodes toSet) } toMap
+    }
   }
   
   def printChain(chain : Map[CFG.ControlFlowNode, Domain]) = {
@@ -215,16 +226,6 @@ object DefUseChain {
         case (v, dn) => v.value + " -> " + Dominance.printWorklist(dn toList) 
       }).mkString(", ")
     }).mkString("\n")
-  }
-
-  def getRDLatticeBottom(cfg: CFG.ControlFlowGraph): Domain = {
-    val idens: List[AST.Identifier] = CommonSubExp.extractIdentifiers(cfg)
-    idens map { (_, Set[CFG.ControlFlowNode]()) } toMap
-  }
-
-  def getRDLatticeTop(cfg: CFG.ControlFlowGraph): Domain = {
-    val idens: List[AST.Identifier] = CommonSubExp.extractIdentifiers(cfg)
-    idens map { (_, cfg.nodes toSet) } toMap
   }
 
   def makeGraph(cfg: CFG.ControlFlowGraph, chain: Map[CFG.ControlFlowNode, Domain]): CFG.ControlFlowGraph = {

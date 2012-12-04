@@ -126,16 +126,21 @@ object JSAnalysis {
 	}
 	
 	def graphDefUse(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-	  val reachingDefs = new DefUseChain.ReachingDefs(DefUseChain.getRDLatticeBottom(cfg), DefUseChain.getRDLatticeTop(cfg))
+	  val reachingDefs = new DefUseChain.ReachingDefs(cfg)
 	  val analysis = DataFlowAnalysis.worklistalgorithm(reachingDefs, cfg)
 	  val defUseChain = reachingDefs.useDefChain(cfg, analysis)
 	  
-	  //println(DefUseChain.printChain(defUseChain))
+	  val blocked = ControlFlow.toBlocked(cfg)
+	  
+	  println(DefUseChain.printChain(defUseChain))
 	  //println(DefUseChain.printReachingDefs(analysis))
 	  //println(DefUseChain.printAssignedVars(reachingDefs.assignedVars))
 	  
 	  GraphvizDrawer.export(CFGGrapher.graph("Dom", DefUseChain.makeGraph(cfg, defUseChain)), new PrintStream(dir + filename+".duc.dot"))
 	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".duc.gif " + dir + filename+".duc.dot")
+	  
+	  GraphvizDrawer.export(CFGGrapher.graph("BasicBlocks", blocked), new PrintStream(dir + filename+".block.dot"))
+	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".block.gif " + dir + filename+".block.dot")
 	}
 	
 	def main(args : Array[String]) = {
