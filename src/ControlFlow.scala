@@ -20,6 +20,8 @@ object CFG {
 	case class DefaultClause(id: String = UUID.randomUUID().toString()) extends Case
 	case class Break(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class Empty(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Block(var lst : List[ControlFlowNode], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Phi(var varName : AST.Identifier, var options : List[AST.Identifier] = List[AST.Identifier](), id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 
 	case class ControlFlowGraph(
 		start : ControlFlowNode, 
@@ -539,6 +541,67 @@ object ControlFlow {
 		case Some(se) => removeEmptyNodes(sourceElements(se))
 		case None => emptyCFG()
 	}
+	
+	def toBlocked(cfg : CFG.ControlFlowGraph) = {	  
+	  def getChildren(n : CFG.ControlFlowNode) = {
+	    cfg.edges.filter({ case (from, to) => from == n}).map({ case (from, to) => to })
+	  }
+	  
+	  def getParents(n : CFG.ControlFlowNode) = {
+	    cfg.edges.filter({ case (from, to) => to == n}).map({ case (from, to) => from })
+	  }
+	  
+	  def findLeaders() = {
+	    var leaders = List[CFG.ControlFlowNode]()
+	    cfg.nodes.foreach {
+	      n => {
+	        if ((n == cfg.nodes.head) || (getParents(n).length == 0)) {
+	          leaders = leaders :+ n
+	        }
+	        leaders = leaders ::: (n match {
+	          case n : CFG.If => getChildren(n)
+	          case n : CFG.DoWhile => getChildren(n)
+	          case n : CFG.Switch => getChildren(n)
+	          case n : CFG.ForIn => getChildren(n)
+	          case n : CFG.Merge => List(n)
+	          case _ => List()
+	        })
+	      }
+	    }
+	    leaders.distinct
+	  }
+	  
+	  def findBlocks(leaders : List[CFG.ControlFlowNode]) = {	    
+	    leaders.map {
+	      l => {
+	        var node = l
+	        var lst = List[CFG.ControlFlowNode]()
+	        var children = List[CFG.ControlFlowNode]()
+	        do {
+	          children = getChildren(node)
+	          lst = lst :+ node
+	          if (children.length == 1) node = children.head
+	        } while ((children.length == 1) && (!leaders.contains(node)))
+	        
+	        CFG.Block(lst)
+	      }
+	    }
+	  }
+	  
+	  val nodes = findBlocks(findLeaders())
+	  
+	  val starts = nodes.map({ n => (n.lst.head, n) }).toMap
+	  val ends = nodes.map({ n => (n.lst.last, n) }).toMap
+	  
+	  //println("starts: " + starts.map({ case (k, v) => CFGGrapher.nodeToString(k) }).mkString(", "))
+	  //println("ends: " + ends.map({ case (k, v) => CFGGrapher.nodeToString(k) }).mkString(", "))
+	  
+	  val edges = nodes.map {
+	    n => getParents(n.lst.head).map(p => { (ends(p), n) }) ::: getChildren(n.lst.last).map(c => { (n, starts(c)) })
+	  }.flatten.distinct
+	  
+	  CFG.ControlFlowGraph(starts(cfg.start), ends(cfg.end), nodes, edges, edges.map({ case e => (e, "") }).toMap, cfg.info)
+	}
 }
 
 object CFGGrapher {
@@ -557,6 +620,8 @@ object CFGGrapher {
  		case CFG.Switch(e,_) => "Switch: %s".format(e)
  		case CFG.CaseClause(e,_) => "Case: %s".format(e)
  		case CFG.DefaultClause(_) => "Default Case"
+ 		case CFG.Block(lst, _) => lst.map(nodeToString(_)).mkString("\n")
+ 		case CFG.Phi(varName, lst, _) => "%s = Phi(%s)".format(varName.value, lst.map(_.value).mkString(", "))
  	}
 
 	 def nodeId( n : CFG.ControlFlowNode ) : String = n match {
@@ -574,6 +639,8 @@ object CFGGrapher {
  		case CFG.Switch(_,id) => id 
  		case CFG.CaseClause(_,id) => id
  		case CFG.DefaultClause(id) => id
+ 		case CFG.Block(_, id) => id
+ 		case CFG.Phi(_, _, id) => id
 	 }
 
 	def graph(n : String, cfg : CFG.ControlFlowGraph, startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
