@@ -7,12 +7,16 @@ object Dominance {
   
   class DominanceConstructor(val cfg : CFG.ControlFlowGraph) {
     val bottom = Set(cfg.nodes: _*)
-    val top = Set(cfg.nodes.head)
+    val top = Set(cfg.start)
     
     def flowFunction(info_in1 : List[Set[CFG.ControlFlowNode]], node : CFG.ControlFlowNode) : Set[CFG.ControlFlowNode] = {
       val info_in = if (info_in1.length == 0) top :: info_in1 else info_in1
       val info_out = node match {
         case node : CFG.Merge => info_in.foldLeft(bottom) { (map, e) => map.intersect(e) }
+        case node : CFG.Block => node.lst.head match {
+          case h : CFG.Merge => info_in.foldLeft(bottom) { (map, e) => map.intersect(e) }
+          case _ => info_in.head
+        }
         case _ => info_in.head
       }
       info_out.union(Set(node))
@@ -20,7 +24,7 @@ object Dominance {
     
     def dom() : infoT = {
       val worklistStart: List[CFG.ControlFlowNode] = cfg.nodes
-      val mapStart = cfg.nodes.map { n : CFG.ControlFlowNode => if (n != cfg.nodes.head) (n, bottom) else (n, Set(n)) } toMap
+      val mapStart = cfg.nodes.map { n : CFG.ControlFlowNode => if (n != cfg.start) (n, bottom) else (n, Set(n)) } toMap
       
       def iterateWorklist(list : List[CFG.ControlFlowNode], map : infoT) : infoT = {
         list.size match {
@@ -46,7 +50,7 @@ object Dominance {
       // strictly dominates n but does not strictly dominate any other node 
       // that strictly dominates n.
 
-      dom.-(cfg.nodes.head).map {
+      dom.-(cfg.start).map {
         case (node, doms) => (node, (doms - node).map {
           e =>
             if (doms.-(node).foldLeft(true) { (bool, cand) => bool && dom(e).contains(cand) }) {
@@ -55,7 +59,7 @@ object Dominance {
               List()
             }
         } flatten)
-      }.toMap + (cfg.nodes.head -> Set(cfg.nodes.head))
+      }.toMap + (cfg.start -> Set(cfg.start))
     }
     
     def domFront(idom : infoT) = {

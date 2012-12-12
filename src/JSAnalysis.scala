@@ -51,6 +51,7 @@ object JSAnalysis {
 		if (opts.graphAst) graphAST(ast, filename, dir)
    	    
 	    var cfg = ControlFlow.program( ast )
+	    var bcfg = ControlFlow.toBlocked(cfg)
 	    var rcfg = ControlFlow.reverse( cfg )
 
 		if (opts.graphCfg) graphCFG(cfg, filename, dir)
@@ -59,9 +60,9 @@ object JSAnalysis {
 
 		if (opts.graphLiveness) graphLiveness(cfg, rcfg, filename, dir)
 
-		if (opts.graphDom) graphDom(cfg, filename, dir)
+		if (opts.graphDom) graphDom(bcfg, filename, dir)
 		
-		if (opts.graphDefUse) graphDefUse(cfg, filename, dir)
+		if (opts.graphDefUse) graphDefUse(cfg, bcfg, filename, dir)
 	}
 
 	def makeAst(file: File) : AST.Program = {
@@ -109,38 +110,36 @@ object JSAnalysis {
 	}
 	
 	def graphDom(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
-	    val analysis = new Dominance.DominanceConstructor(cfg)
-	    val dominance = analysis.dom()
-	    //println("Constructed dominance")
-	    val idom = analysis.idom(dominance)
-	    //println("Found idoms")
-	    //analysis.printIDom(idom)
-	    val df = analysis.domFront(idom)
-	    //println("Found domFront")
-	    //analysis.printDF(df)
-		GraphvizDrawer.export(CFGGrapher.graph("Dom", Dominance.makeGraph(cfg, dominance)), new PrintStream(dir + filename+".dom.dot"))
-		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".dom.gif " + dir + filename+".dom.dot")
-		
-		GraphvizDrawer.export(CFGGrapher.graph("IDom", Dominance.makeGraph(cfg, idom)), new PrintStream(dir + filename+".idom.dot"))
-		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".idom.gif " + dir + filename+".idom.dot")
 	}
 	
-	def graphDefUse(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
+	def graphDefUse(cfg : CFG.ControlFlowGraph, bcfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
 	  val reachingDefs = new DefUseChain.ReachingDefs(cfg)
 	  val analysis = DataFlowAnalysis.worklistalgorithm(reachingDefs, cfg)
 	  val defUseChain = reachingDefs.useDefChain(cfg, analysis)
 	  
-	  val blocked = ControlFlow.toBlocked(cfg)
+	  val domAnalysis = new Dominance.DominanceConstructor(bcfg)
+	  val dominance = domAnalysis.dom()
+	  val idom = domAnalysis.idom(dominance)
+
+	  val df = domAnalysis.domFront(idom)
 	  
-	  println(DefUseChain.printChain(defUseChain))
-	  //println(DefUseChain.printReachingDefs(analysis))
-	  //println(DefUseChain.printAssignedVars(reachingDefs.assignedVars))
+	  val domTree = Dominance.makeGraph(bcfg, idom - bcfg.start)
 	  
-	  GraphvizDrawer.export(CFGGrapher.graph("Dom", DefUseChain.makeGraph(cfg, defUseChain)), new PrintStream(dir + filename+".duc.dot"))
+	  //domAnalysis.printDF(df)
+	  GraphvizDrawer.export(CFGGrapher.graph("Dom", Dominance.makeGraph(bcfg, dominance)), new PrintStream(dir + filename+".dom.dot"))
+	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".dom.gif " + dir + filename+".dom.dot")
+		
+	  GraphvizDrawer.export(CFGGrapher.graph("IDom", domTree), new PrintStream(dir + filename+".idom.dot"))
+	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".idom.gif " + dir + filename+".idom.dot")
+	  
+	  //
+	  
+	  GraphvizDrawer.export(CFGGrapher.graph("Def-Use chain", DefUseChain.makeGraph(cfg, defUseChain)), new PrintStream(dir + filename+".duc.dot"))
 	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".duc.gif " + dir + filename+".duc.dot")
 	  
-	  GraphvizDrawer.export(CFGGrapher.graph("BasicBlocks", blocked), new PrintStream(dir + filename+".block.dot"))
-	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".block.gif " + dir + filename+".block.dot")
+	  val nbcfg = SSA(bcfg, defUseChain, domTree, df)
+	  GraphvizDrawer.export(CFGGrapher.graph("Phi", nbcfg), new PrintStream(dir + filename+".phi.dot"))
+	  Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".phi.gif " + dir + filename+".phi.dot")
 	}
 	
 	def main(args : Array[String]) = {

@@ -232,7 +232,7 @@ object AST {
 	  override def toString() = "undefined"
 	}
 
-	case class Identifier(value: String) extends Expression {
+	case class Identifier(var value: String) extends Expression {
 	  override def graphPrint(printer: ASTGrapher.Graph, level:Int) = {
 	    val n = printer.addNode("Identifier", List(("id", value), ("line", pos.line.toString())), level)
 	    n

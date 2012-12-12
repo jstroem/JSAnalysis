@@ -10,7 +10,7 @@ object DefUseChain {
     lazy val top = getRDLatticeTop()
     
     lazy val assignedVars = cfg.nodes.map(n => (n, getAssignedVars(n))).toMap
-    lazy val vars = assignedVars.values.foldLeft(List[AST.Identifier]())({ (soFar, e) => soFar.union(e) }).distinct
+    lazy val vars = assignedVars.values.foldLeft(Set[AST.Identifier]())({ (soFar, e) => soFar.union(e) })
     
     def getBottom = {
       bottom
@@ -55,29 +55,22 @@ object DefUseChain {
         case _ => {
           val vars = assignedVars(node)
           val changedVars = info_in.head.filter({ case (key, value) => vars.contains(key) }).keys
-          //println(CFGGrapher.nodeToString(node) + " : " + changedVars.map(_.value).mkString(", "))
-          //println("Node: " + CFGGrapher.nodeToString(node))
-          //println("Original: " + printInfo(info_in.head))
           val killed = (info_in.head -- changedVars)
           val added = (vars.map { (_, Set(node)) } toMap)
           val res = killed ++ added
-          //println("Remaining: " + printInfo(killed))
-          //println("Added: " + printInfo(added))
-          //println("New: " + printInfo(res))
-          //println("---")
           res
         }
       }
     }
 
-    def getAssignedVars (node: CFG.ControlFlowNode) : List[AST.Identifier] = {
-      def expressionType(exp : AST.Expression, vars : List[AST.Identifier]) : List[AST.Identifier] = {
+    def getAssignedVars (node: CFG.ControlFlowNode) : Set[AST.Identifier] = {
+      def expressionType(exp : AST.Expression, vars : Set[AST.Identifier]) : Set[AST.Identifier] = {
         exp match {
           case AST.ExpressionList(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
           case AST.AssignmentExpression(e1, op, e2) => e1 match {
-            case e : AST.Identifier => e :: vars
-            case AST.ArrayAccessExpression(i : AST.Identifier, e2) => expressionType(e2, i :: vars)
-            case AST.ObjectAccessExpression(i : AST.Identifier, i2) => i :: vars
+            case e : AST.Identifier => vars + e
+            case AST.ArrayAccessExpression(i : AST.Identifier, e2) => expressionType(e2, vars)
+            case AST.ObjectAccessExpression(i : AST.Identifier, i2) => vars + i
             case _ => vars
           }
           case AST.BinaryExpression(op, e1, e2) => expressionType(e2, expressionType(e1, vars))
@@ -99,7 +92,7 @@ object DefUseChain {
         }
       }
 
-      val list = List[AST.Identifier]()
+      val list = Set[AST.Identifier]()
       
       (node match {
         case CFG.Continue(oe, _) => oe match {
@@ -112,80 +105,26 @@ object DefUseChain {
         }
         case CFG.Expression(e, _) => expressionType(e, list)
         case CFG.Assignment(i, e, _) => e match {
-          case Some(e) => i :: expressionType(e, list)
+          case Some(e) => expressionType(e, list) + i
           case None => list
         }
         case CFG.If(e, _) => expressionType(e, list)
         case CFG.DoWhile(e, _) => expressionType(e, list)
         case CFG.ForIn(e1, e2, _) => e1 match {
-          case e1: AST.Identifier => e1 :: expressionType(e2, list)
+          case e1: AST.Identifier => expressionType(e2, list) + e1
           case _ => expressionType(e2, list)
         }
         case CFG.With(e, _) => expressionType(e, list)
         case CFG.Switch(e, _) => expressionType(e, list)
         case CFG.CaseClause(e, _) => expressionType(e, list)
+        
+        case CFG.Block(lst, _) => lst.map(getAssignedVars).foldLeft(Set[AST.Identifier]()){ (soFar, e) => soFar.union(e) }
         case _ => list;
       }) 
     }
     
-    def getUsedVars(cfg: CFG.ControlFlowGraph) : Map[CFG.ControlFlowNode, Set[AST.Identifier]] = {
-      def expressionType(exp : AST.Expression, vars : Set[AST.Identifier]) : Set[AST.Identifier] = {
-        exp match {
-          case AST.ExpressionList(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
-          case AST.AssignmentExpression(e1, op, e2) => e1 match {
-            case i : AST.Identifier => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
-            case AST.ArrayAccessExpression(i : AST.Identifier, e) => if (op != "=") expressionType(e2, expressionType(e, vars)) + i else expressionType(e2, expressionType(e, vars))
-            case AST.ObjectAccessExpression(i : AST.Identifier, i2) => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
-            case _ => expressionType(e2, expressionType(e1, vars))
-          }
-          case AST.BinaryExpression(op, e1, e2) => expressionType(e2, expressionType(e1, vars))
-          case AST.UnaryExpression(op, e) => expressionType(e, vars)
-          case AST.PostfixExpression(op, e) => expressionType(e, vars)
-          case AST.ConditionalExpression(e1, e2, e3) => expressionType(e3, expressionType(e2, expressionType(e1, vars)))
-          case AST.CallExpression(e, oes) => expressionType(e, oes match {
-            case Some(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
-            case None => vars
-          })
-          case AST.AllocationExpression(e) => expressionType(e, vars)
-          case AST.ArrayAccessExpression(e1, e2) => expressionType(e2, expressionType(e1, vars))
-          case AST.ObjectAccessExpression(e, i) => expressionType(e, vars)
-          case AST.ArrayLiteral(oes) => oes match {
-            case Some(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
-            case None => vars
-          }
-          case id : AST.Identifier => vars + id
-          case _ => vars
-        }
-      }
-
-      val list = Set[AST.Identifier]()
-      
-      (cfg.nodes.map { node => (node, node match {
-        case CFG.Continue(oe, _) => oe match {
-          case Some(e) => expressionType(e, list)
-          case None => list
-        }
-        case CFG.Return(oe, _) => oe match {
-          case Some(e) => expressionType(e, list)
-          case None => list
-        }
-        case CFG.Expression(e, _) => expressionType(e, list)
-        case CFG.Assignment(i, e, _) => e match {
-          case Some(e) => expressionType(e, list)
-          case None => list
-        }
-        case CFG.If(e, _) => expressionType(e, list)
-        case CFG.DoWhile(e, _) => expressionType(e, list)
-        case CFG.ForIn(e1, e2, _) => expressionType(e2, list)
-        case CFG.With(e, _) => expressionType(e, list)
-        case CFG.Switch(e, _) => expressionType(e, list)
-        case CFG.CaseClause(e, _) => expressionType(e, list)
-        case _ => list;
-      })}) toMap
-    }
-    
     def useDefChain(cfg : CFG.ControlFlowGraph, reachingDefs : Map[Edge, Domain]) = {
-      val uses = getUsedVars(cfg)
+      val uses = getAllUsedVars(cfg)
       cfg.nodes map { node =>
         (node, 
         (((reachingDefs filter { 
@@ -209,7 +148,7 @@ object DefUseChain {
   
   def printChain(chain : Map[CFG.ControlFlowNode, Domain]) = {
     chain.map({
-      case (node, defs) => CFGGrapher.nodeToString(node) + " : " + defs.map({ 
+      case (node, defs) => "%" + CFGGrapher.nodeToString(node) + "% : " + defs.map({ 
         case (v, dn) => v.value + " -> " + Dominance.printWorklist(dn toList) }).mkString(", ")
     }).mkString("\n")
   }
@@ -240,5 +179,67 @@ object DefUseChain {
     val labels = cfg.labels ++ (edgeLabels toMap)
 
     CFG.ControlFlowGraph(cfg.start, cfg.end, cfg.nodes, edges, labels, cfg.info)
+  }
+
+  def getUsedVars(node: CFG.ControlFlowNode): Set[AST.Identifier] = {
+    def expressionType(exp: AST.Expression, vars: Set[AST.Identifier]): Set[AST.Identifier] = {
+      exp match {
+        case AST.ExpressionList(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
+        case AST.AssignmentExpression(e1, op, e2) => e1 match {
+          case i: AST.Identifier => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
+          case AST.ArrayAccessExpression(i: AST.Identifier, e) => if (op != "=") expressionType(e2, expressionType(e, vars)) + i else expressionType(e2, expressionType(e, vars))
+          case AST.ObjectAccessExpression(i: AST.Identifier, i2) => if (op != "=") expressionType(e2, vars) + i else expressionType(e2, vars)
+          case _ => expressionType(e2, expressionType(e1, vars))
+        }
+        case AST.BinaryExpression(op, e1, e2) => expressionType(e2, expressionType(e1, vars))
+        case AST.UnaryExpression(op, e) => expressionType(e, vars)
+        case AST.PostfixExpression(op, e) => expressionType(e, vars)
+        case AST.ConditionalExpression(e1, e2, e3) => expressionType(e3, expressionType(e2, expressionType(e1, vars)))
+        case AST.CallExpression(e, oes) => expressionType(e, oes match {
+          case Some(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
+          case None => vars
+        })
+        case AST.AllocationExpression(e) => expressionType(e, vars)
+        case AST.ArrayAccessExpression(e1, e2) => expressionType(e2, expressionType(e1, vars))
+        case AST.ObjectAccessExpression(e, i) => expressionType(e, vars)
+        case AST.ArrayLiteral(oes) => oes match {
+          case Some(es) => es.foldLeft(vars)((list, exp) => expressionType(exp, list))
+          case None => vars
+        }
+        case id: AST.Identifier => vars + id
+        case _ => vars
+      }
+    }
+
+    val list = Set[AST.Identifier]()
+
+    node match {
+      case CFG.Continue(oe, _) => oe match {
+        case Some(e) => expressionType(e, list)
+        case None => list
+      }
+      case CFG.Return(oe, _) => oe match {
+        case Some(e) => expressionType(e, list)
+        case None => list
+      }
+      case CFG.Expression(e, _) => expressionType(e, list)
+      case CFG.Assignment(i, e, _) => e match {
+        case Some(e) => expressionType(e, list)
+        case None => list
+      }
+      case CFG.If(e, _) => expressionType(e, list)
+      case CFG.DoWhile(e, _) => expressionType(e, list)
+      case CFG.ForIn(e1, e2, _) => expressionType(e2, list)
+      case CFG.With(e, _) => expressionType(e, list)
+      case CFG.Switch(e, _) => expressionType(e, list)
+      case CFG.CaseClause(e, _) => expressionType(e, list)
+
+      case CFG.Block(lst, _) => lst.map(getUsedVars).foldLeft(Set[AST.Identifier]()) { (soFar, e) => soFar.union(e) }
+      case _ => list;
+    }
+  }
+
+  def getAllUsedVars(cfg: CFG.ControlFlowGraph) = {
+    (cfg.nodes.map { node => (node, getUsedVars(node)) }) toMap
   }
 }

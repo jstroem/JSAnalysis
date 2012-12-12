@@ -20,7 +20,8 @@ object CFG {
 	case class DefaultClause(id: String = UUID.randomUUID().toString()) extends Case
 	case class Break(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 	case class Empty(id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
-	case class Block(lst : List[ControlFlowNode], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Block(var lst : List[ControlFlowNode], id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
+	case class Phi(var varName : AST.Identifier, var options : List[AST.Identifier] = List[AST.Identifier](), id: String = UUID.randomUUID().toString()) extends ControlFlowNode()
 
 	case class ControlFlowGraph(
 		start : ControlFlowNode, 
@@ -620,6 +621,7 @@ object CFGGrapher {
  		case CFG.CaseClause(e,_) => "Case: %s".format(e)
  		case CFG.DefaultClause(_) => "Default Case"
  		case CFG.Block(lst, _) => lst.map(nodeToString(_)).mkString("\n")
+ 		case CFG.Phi(varName, lst, _) => "%s = Phi(%s)".format(varName.value, lst.map(_.value).mkString(", "))
  	}
 
 	 def nodeId( n : CFG.ControlFlowNode ) : String = n match {
@@ -638,6 +640,7 @@ object CFGGrapher {
  		case CFG.CaseClause(_,id) => id
  		case CFG.DefaultClause(id) => id
  		case CFG.Block(_, id) => id
+ 		case CFG.Phi(_, _, id) => id
 	 }
 
 	def graph(n : String, cfg : CFG.ControlFlowGraph, startEndNodes : Boolean = true) : GraphvizDrawer.Graph = {
