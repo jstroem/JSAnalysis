@@ -8,13 +8,15 @@ object JSAnalysis {
 			graphCfg: Boolean = false, 
 			graphCSE: Boolean = false, 
 			graphLiveness: Boolean = false, 
+			graphCall: Boolean = false, 
 		 	files: List[String] = List()) {
 		override def toString() = {
 			"" +(if (printAst) "printAst " else "") + 
 				(if (graphAst) "graphAst " else "") + 
 				(if (graphCfg) "graphCfg " else "") + 
 				(if (graphCSE) "graphCSE " else "") +
-				(if (graphLiveness) "graphLiveness " else "")
+				(if (graphLiveness) "graphLiveness " else "") +
+				(if (graphCall) "graphCall " else "")
 		}
 	}
 
@@ -47,12 +49,15 @@ object JSAnalysis {
    	    
 	    var cfg = ControlFlow.program( ast )
 	    var rcfg = ControlFlow.reverse( cfg )
+	    var callFG = CallFG.createCFG( cfg )
 
 		if (opts.graphCfg) graphCFG(cfg, filename, dir)
 
 		if (opts.graphCSE) graphCSE(cfg, filename, dir)
 
 		if (opts.graphLiveness) graphLiveness(cfg, rcfg, filename, dir)
+
+		if (opts.graphCall) graphCall(callFG, filename,dir)
 
 	}
 
@@ -75,6 +80,11 @@ object JSAnalysis {
 	def graphCFG(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
 		GraphvizDrawer.export(CFGGrapher.graph("ControlFlowGraph",cfg), new PrintStream(dir + filename+".cfg.dot"))
 		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".cfg.gif " + dir + filename+".cfg.dot")
+	}
+
+	def graphCall(cfg : CallFG.CallFlowGraph, filename : String, dir: String) : Unit = {
+		GraphvizDrawer.export(CallFG.graph("CallFlowGraph",cfg), new PrintStream(dir + filename+".call.dot"))
+		Runtime.getRuntime().exec("dot -Tgif -o "+dir + filename+".call.gif " + dir + filename+".call.dot")
 	}
 
 	def graphCSE(cfg : CFG.ControlFlowGraph, filename : String, dir: String) : Unit = {
@@ -101,12 +111,13 @@ object JSAnalysis {
 	
 	def main(args : Array[String]) = {
 		val opts = args.foldLeft(RuntimeOpts())((opts,arg) => arg match {
-			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.files)
-			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.files)
-			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.graphLiveness, opts.files)
-			case "-graph-cse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, true, opts.graphLiveness, opts.files)
-			case "-graph-liveness" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, true, opts.files)
-			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, arg :: opts.files)
+			case "-print-ast" => RuntimeOpts(true, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphCall, opts.files)
+			case "-graph-ast" => RuntimeOpts(opts.printAst, true, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphCall, opts.files)
+			case "-graph-cfg" => RuntimeOpts(opts.printAst, opts.printAst, true, opts.graphCSE, opts.graphLiveness, opts.graphCall, opts.files)
+			case "-graph-cse" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, true, opts.graphLiveness, opts.graphCall, opts.files)
+			case "-graph-liveness" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, true, opts.graphCall, opts.files)
+			case "-graph-call" => RuntimeOpts(opts.printAst, opts.printAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, true, opts.files)
+			case _ => RuntimeOpts(opts.printAst, opts.graphAst, opts.graphCfg, opts.graphCSE, opts.graphLiveness, opts.graphCall, arg :: opts.files)
 		})
 		println("Running analysis with options: "+ opts.toString())
 
